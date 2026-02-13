@@ -25,3 +25,26 @@
 .input {
   @apply w-full rounded-2xl px-4 py-3 border border-zinc-200 dark:border-zinc-700 bg-transparent;
 }
+
+
+/* Fix dark mode selects + inputs */
+
+/* Fix dropdown dark mode */
+select {
+  @apply
+    w-full
+    rounded-2xl
+    border
+    border-zinc-200
+    dark:border-zinc-800
+    bg-white
+    dark:bg-zinc-900
+    text-zinc-900
+    dark:text-white
+    px-3
+    py-2
+    focus:outline-none
+    focus:ring-2
+    focus:ring-blue-200
+    dark:focus:ring-blue-900;
+}

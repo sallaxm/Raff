@@ -1,2 +1,3 @@
-insert into profiles (id, institution_id, role, credits)
-values ('1719b26c-bf88-4d42-8970-9060e7583fa9','udst','mod',8);
+update public.profiles
+set role = 'admin'
+where id = 'a4c0708e-ac5a-4352-b2f9-c68e386e8f85';
