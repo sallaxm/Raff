@@ -12,7 +12,7 @@ type Row = {
   created_at: string;
   uploader_id: string | null;
   course_id: string | null;
-  courses?: { code: string; name: string } | null;
+  courses?: { code: string; name: string }[] | null; // ✅ array (Supabase returns array)
 };
 
 const TYPES = ["Past Paper", "Notes", "Assignment", "Lab", "Other"];
@@ -73,7 +73,7 @@ export default function ModPage() {
 
     if (error) setMsg(error.message);
 
-    const safe = (data ?? []) as Row[];
+    const safe = (data ?? []) as unknown as Row[];
     setRows(safe);
     setLoading(false);
   }
@@ -143,7 +143,6 @@ export default function ModPage() {
   }
 
   async function togglePreview(id: string) {
-    // close if same
     if (openPreviewId === id) {
       setOpenPreviewId(null);
       return;
@@ -152,7 +151,6 @@ export default function ModPage() {
     setMsg("");
     setOpenPreviewId(id);
 
-    // already fetched
     if (previewUrlById[id]) return;
 
     setPreviewLoadingById((p) => ({ ...p, [id]: true }));
@@ -204,18 +202,14 @@ export default function ModPage() {
           const editing = editingId === r.id;
           const previewOpen = openPreviewId === r.id;
 
-          const courseLine = r.courses?.code
-            ? `${r.courses.code} — ${r.courses.name}`
-            : r.course_id
-              ? "Course selected"
-              : "No course";
+          const c0 = r.courses?.[0] ?? null;
+          const courseLine = c0?.code ? `${c0.code} — ${c0.name}` : r.course_id ? "Course selected" : "No course";
 
           const previewLoading = !!previewLoadingById[r.id];
           const previewUrl = previewUrlById[r.id];
 
           return (
             <Card key={r.id}>
-              {/* Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 w-full">
                   {!editing ? (
@@ -303,7 +297,6 @@ export default function ModPage() {
                 )}
               </div>
 
-              {/* Actions */}
               <div className="mt-4 flex gap-2 flex-wrap">
                 <button
                   onClick={() => togglePreview(r.id)}
@@ -349,20 +342,13 @@ export default function ModPage() {
                 </button>
               </div>
 
-              {/* Preview panel */}
               {previewOpen && (
                 <div className="mt-4">
                   <div className="rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
-                    {previewLoading && (
-                      <div className="p-4 text-sm text-zinc-500">Loading preview…</div>
-                    )}
+                    {previewLoading && <div className="p-4 text-sm text-zinc-500">Loading preview…</div>}
 
                     {!previewLoading && previewUrl && (
-                      <iframe
-                        src={previewUrl}
-                        className="w-full h-[520px]"
-                        title="File preview"
-                      />
+                      <iframe src={previewUrl} className="w-full h-[520px]" title="File preview" />
                     )}
 
                     {!previewLoading && !previewUrl && (
