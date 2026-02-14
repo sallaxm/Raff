@@ -38,7 +38,11 @@ export default function SideNav() {
   useEffect(() => {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      if (!u.user) {
+        setRole(null);
+        setCredits(null);
+        return;
+      }
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -55,23 +59,19 @@ export default function SideNav() {
 
   return (
     <nav className="px-2 pb-4 overflow-y-auto">
-
       {/* CREDIT CARD */}
       {credits !== null && (
-        <div className="
-          mt-4 mx-2 p-3 rounded-2xl
-          bg-gradient-to-br from-blue-50 via-white to-pink-50
-          dark:from-zinc-900 dark:to-zinc-800
-          border border-zinc-200 dark:border-zinc-800
-          text-sm
-        ">
-          <div className="text-xs text-zinc-500">
-            Credits
-          </div>
-
-          <div className="text-xl font-semibold">
-            {credits}
-          </div>
+        <div
+          className="
+            mt-4 mx-2 p-3 rounded-2xl
+            bg-gradient-to-br from-blue-50 via-white to-pink-50
+            dark:from-zinc-900 dark:to-zinc-800
+            border border-zinc-200 dark:border-zinc-800
+            text-sm
+          "
+        >
+          <div className="text-xs text-zinc-500">Credits</div>
+          <div className="text-xl font-semibold">{credits}</div>
         </div>
       )}
 
@@ -85,7 +85,14 @@ export default function SideNav() {
       {/* ACCOUNT */}
       <Section title="ACCOUNT" />
       <NavItem href="/credits" label="Credits" />
-      <NavItem href="/profile" label="Profile" /> 
+      <NavItem href="/profile" label="Profile" />
+
+      {/* INFO */}
+      <Section title="INFO" />
+      <NavItem href="/guidelines" label="Guidelines" />
+      <NavItem href="/feedback" label="Feedback" />
+      <NavItem href="/privacy" label="Privacy" />
+      <NavItem href="/about" label="About" />
 
       {/* MOD */}
       {isMod && (
