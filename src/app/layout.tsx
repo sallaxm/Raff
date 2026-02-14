@@ -1,29 +1,42 @@
+// src/app/layout.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import SideNav from "@/app/_components/SideNav";
 import "./globals.css";
 
-
 export const metadata: Metadata = {
   title: "Raff",
-  description: "Past papers, notes, and assignments — organized by course.",
+  description: "Past papers, notes, and assignments — organized by college, major, and course.",
 };
 
-function NavItem({ href, label }: { href: string; label: string }) {
+function TopLink({ href, label }: { href: string; label: string }) {
   return (
     <Link
       href={href}
       className="
-        flex items-center gap-2
-        px-3 py-2 rounded-2xl
-        text-sm text-zinc-700
-        hover:bg-white/60 transition
+        px-3 py-2 rounded-2xl text-sm
+        text-zinc-700 hover:bg-white/60 transition
         dark:text-zinc-200 dark:hover:bg-zinc-800/60
       "
     >
-      <span className="opacity-70">•</span>
-      <span>{label}</span>
+      {label}
+    </Link>
+  );
+}
+
+function MobileNavLink({ href, label }: { href: string; label: string }) {
+  return (
+    <Link
+      href={href}
+      className="
+        flex-1 text-center
+        px-3 py-2 rounded-2xl text-sm
+        text-zinc-700 hover:bg-white/60 transition
+        dark:text-zinc-200 dark:hover:bg-zinc-800/60
+      "
+    >
+      {label}
     </Link>
   );
 }
@@ -35,9 +48,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className="
           min-h-screen text-zinc-900 dark:text-white
           bg-zinc-50 dark:bg-black
+          overflow-x-hidden
         "
       >
-        {/* Background that makes “glass” visible */}
+        {/* Background “soft glossy” */}
         <div
           className="
             min-h-screen
@@ -49,8 +63,30 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 radial-gradient(circle_at_50%_80%,rgba(167,139,250,0.08),transparent_55%)]
           "
         >
+          {/* Mobile header (udst.tools-ish) */}
+          <header
+            className="
+              md:hidden sticky top-0 z-30
+              bg-white/65 dark:bg-zinc-900/65
+              backdrop-blur-xl
+              border-b border-white/40 dark:border-zinc-800
+            "
+          >
+            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+              <Link href="/" className="font-semibold tracking-tight">
+                Raff
+              </Link>
+
+              <div className="flex items-center gap-1">
+                <TopLink href="/browse" label="Browse" />
+                <TopLink href="/upload" label="Upload" />
+                <ThemeToggle />
+              </div>
+            </div>
+          </header>
+
           <div className="min-h-screen flex">
-            {/* Sidebar (glass) */}
+            {/* Desktop sidebar */}
             <aside
               className="
                 hidden md:flex md:flex-col
@@ -65,30 +101,45 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 shadow-[0_10px_40px_rgba(0,0,0,0.06)]
               "
             >
-              {/* Brand */}
+              {/* Brand + theme */}
               <div className="p-4">
                 <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-4">
-                  <div className="text-lg font-semibold tracking-tight">
-                      Raff
-                  </div>
-
+                  <div className="text-lg font-semibold tracking-tight">Raff</div>
                   <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                      Student resource exchange
+                    Student resource exchange
                   </div>
-
                   <div className="mt-3">
                     <ThemeToggle />
                   </div>
                 </div>
               </div>
 
-              {/* Nav */}
+              {/* Main nav (your existing component, including Mod hiding) */}
               <SideNav />
 
-              {/* Footer card */}
-              <div className="p-4">
-                <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-4">
-                  <div className="text-xs text-zinc-500 dark:text-zinc-400">
+              {/* “Settings” / info group like udst.tools */}
+              <div className="mt-auto p-4">
+                <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-3 space-y-1">
+                  <Link
+                    href="/about"
+                    className="block px-3 py-2 rounded-2xl text-sm text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    About
+                  </Link>
+                  <Link
+                    href="/privacy"
+                    className="block px-3 py-2 rounded-2xl text-sm text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    Privacy
+                  </Link>
+                  <Link
+                    href="/feedback"
+                    className="block px-3 py-2 rounded-2xl text-sm text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-800/60 transition"
+                  >
+                    Feedback
+                  </Link>
+
+                  <div className="px-3 pt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
                     Tip: upload past papers to earn credits.
                   </div>
                 </div>
@@ -97,35 +148,29 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             {/* Main */}
             <div className="flex-1">
-              {/* Mobile top bar */}
-              <div
-                className="
-                  md:hidden sticky top-0 z-20
-                  bg-white/55 dark:bg-zinc-900/55
-                  backdrop-blur-xl
-                  border-b border-white/40 dark:border-zinc-800
-                "
-              >
-                <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                  <Link href="/" className="font-semibold">
-                    Qatar Uni Share
-                  </Link>
-
-                  <div className="flex items-center gap-2">
-                    <Link
-                      className="px-3 py-2 rounded-2xl hover:bg-white/60 dark:hover:bg-zinc-800/60 transition text-sm"
-                      href="/browse"
-                    >
-                      Browse
-                    </Link>
-                    <ThemeToggle />
-                  </div>
-                </div>
+              {/* Page container */}
+              <div className="max-w-5xl mx-auto px-4 pb-24 md:px-0 md:pb-6">
+                {children}
               </div>
-
-              <div className="max-w-5xl mx-auto">{children}</div>
             </div>
           </div>
+
+          {/* Mobile bottom nav (app-like) */}
+          <nav
+            className="
+              md:hidden fixed bottom-0 left-0 right-0 z-30
+              bg-white/65 dark:bg-zinc-900/65
+              backdrop-blur-xl
+              border-t border-white/40 dark:border-zinc-800
+            "
+          >
+            <div className="max-w-5xl mx-auto px-3 py-2 flex items-center gap-2">
+              <MobileNavLink href="/" label="Home" />
+              <MobileNavLink href="/browse" label="Browse" />
+              <MobileNavLink href="/resources" label="Resources" />
+              <MobileNavLink href="/profile" label="Profile" />
+            </div>
+          </nav>
         </div>
       </body>
     </html>
