@@ -164,7 +164,7 @@ export default function UploadPage() {
   }
 
   return (
-    <main className="max-w-2xl mx-auto p-8 space-y-6">
+    <main className="max-w-2xl mx-auto p-6 space-y-6">
 
       {/* HEADER */}
       <div className="
