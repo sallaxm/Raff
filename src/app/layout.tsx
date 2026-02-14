@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ThemeToggle from "@/components/ThemeToggle";
 import SideNav from "@/app/_components/SideNav";
+import CloseDrawerOnRoute from "@/app/_components/CloseDrawerOnRoute";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -89,6 +90,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 function MobileDrawer() {
   return (
     <div className="md:hidden">
+
+      <CloseDrawerOnRoute drawerId="raff-drawer" />
       <input id="raff-drawer" type="checkbox" className="peer hidden" />
 
       {/* Top bar */}
