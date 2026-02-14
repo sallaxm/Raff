@@ -51,10 +51,11 @@ select {
 
 /* Hide scrollbar but allow scroll */
 .no-scrollbar::-webkit-scrollbar {
-  display: none;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  -ms-overflow-style: none !important; /* IE/Edge legacy */
+  scrollbar-width: none !important; /* Firefox */
 }
