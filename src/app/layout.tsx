@@ -142,7 +142,7 @@ function MobileDrawer() {
       <aside
         className="
           fixed top-0 left-0 z-[60]
-          h-full w-[320px] max-w-[85vw]
+          h-full w-[260px] max-w-[72vw]
           -translate-x-full peer-checked:translate-x-0
           transition-transform duration-200
 
