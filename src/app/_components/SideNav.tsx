@@ -1,3 +1,4 @@
+// src/app/_components/SideNav.tsx
 "use client";
 
 import Link from "next/link";
@@ -12,10 +13,19 @@ function Section({ title }: { title: string }) {
   );
 }
 
-function NavItem({ href, label }: { href: string; label: string }) {
+function NavItem({
+  href,
+  label,
+  onNavigate,
+}: {
+  href: string;
+  label: string;
+  onNavigate?: () => void;
+}) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className="
         flex items-center gap-2
         px-3 py-2 rounded-2xl
@@ -30,7 +40,7 @@ function NavItem({ href, label }: { href: string; label: string }) {
   );
 }
 
-export default function SideNav() {
+export default function SideNav({ onNavigate }: { onNavigate?: () => void }) {
   const supabase = useMemo(() => supabaseBrowser(), []);
   const [role, setRole] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
@@ -38,11 +48,7 @@ export default function SideNav() {
   useEffect(() => {
     (async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
-        setRole(null);
-        setCredits(null);
-        return;
-      }
+      if (!u.user) return;
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -77,28 +83,21 @@ export default function SideNav() {
 
       {/* MAIN */}
       <Section title="MAIN" />
-      <NavItem href="/" label="Home" />
-      <NavItem href="/browse" label="Browse" />
-      <NavItem href="/resources" label="Resources" />
-      <NavItem href="/upload" label="Upload" />
+      <NavItem href="/" label="Home" onNavigate={onNavigate} />
+      <NavItem href="/browse" label="Browse" onNavigate={onNavigate} />
+      <NavItem href="/resources" label="Resources" onNavigate={onNavigate} />
+      <NavItem href="/upload" label="Upload" onNavigate={onNavigate} />
 
       {/* ACCOUNT */}
       <Section title="ACCOUNT" />
-      <NavItem href="/credits" label="Credits" />
-      <NavItem href="/profile" label="Profile" />
-
-      {/* INFO */}
-      <Section title="INFO" />
-      <NavItem href="/guidelines" label="Guidelines" />
-      <NavItem href="/feedback" label="Feedback" />
-      <NavItem href="/privacy" label="Privacy" />
-      <NavItem href="/about" label="About" />
+      <NavItem href="/credits" label="Credits" onNavigate={onNavigate} />
+      <NavItem href="/profile" label="Profile" onNavigate={onNavigate} />
 
       {/* MOD */}
       {isMod && (
         <>
           <Section title="MODERATOR" />
-          <NavItem href="/mod" label="Moderator Panel" />
+          <NavItem href="/mod" label="Moderator Panel" onNavigate={onNavigate} />
         </>
       )}
     </nav>
