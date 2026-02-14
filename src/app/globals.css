@@ -48,3 +48,13 @@ select {
     focus:ring-blue-200
     dark:focus:ring-blue-900;
 }
+
+/* Hide scrollbar but allow scroll */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
