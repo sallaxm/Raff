@@ -3,43 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import SideNav from "@/app/_components/SideNav";
+import MobileDrawerNav from "@/app/_components/MobileDrawerNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Raff",
   description: "Past papers, notes, and assignments — organized by college, major, and course.",
 };
-
-function TopLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="
-        px-3 py-2 rounded-2xl text-sm
-        text-zinc-700 hover:bg-white/60 transition
-        dark:text-zinc-200 dark:hover:bg-zinc-800/60
-      "
-    >
-      {label}
-    </Link>
-  );
-}
-
-function MobileNavLink({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      className="
-        flex-1 text-center
-        px-3 py-2 rounded-2xl text-sm
-        text-zinc-700 hover:bg-white/60 transition
-        dark:text-zinc-200 dark:hover:bg-zinc-800/60
-      "
-    >
-      {label}
-    </Link>
-  );
-}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -73,15 +43,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             "
           >
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-              <Link href="/" className="font-semibold tracking-tight">
-                Raff
-              </Link>
-
-              <div className="flex items-center gap-1">
-                <TopLink href="/browse" label="Browse" />
-                <TopLink href="/upload" label="Upload" />
-                <ThemeToggle />
+              <div className="flex items-center gap-2">
+                <MobileDrawerNav />
+                <Link href="/" className="font-semibold tracking-tight">
+                  Raff
+                </Link>
               </div>
+
+              <ThemeToggle />
             </div>
           </header>
 
@@ -114,10 +83,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </div>
               </div>
 
-              {/* Main nav (your existing component, including Mod hiding) */}
+              {/* Main nav */}
               <SideNav />
 
-              {/* “Settings” / info group like udst.tools */}
+              {/* Settings group */}
               <div className="mt-auto p-4">
                 <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-3 space-y-1">
                   <Link
@@ -148,7 +117,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
             {/* Main */}
             <div className="flex-1">
-              {/* Page container */}
               <div className="max-w-5xl mx-auto px-4 pb-24 md:px-0 md:pb-6">
                 {children}
               </div>

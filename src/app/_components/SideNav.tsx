@@ -85,15 +85,7 @@ export default function SideNav() {
       {/* ACCOUNT */}
       <Section title="ACCOUNT" />
       <NavItem href="/credits" label="Credits" />
-      <NavItem href="/profile" label="Profile" />
-
-      {/* ABOUT */}
-      <Section title="ABOUT" />
-      <NavItem href="/feedback" label="Feedback" />
-      <NavItem href="/privacy" label="Privacy" />
-      <NavItem href="/about" label="About" />
-
-      
+      <NavItem href="/profile" label="Profile" /> 
 
       {/* MOD */}
       {isMod && (
