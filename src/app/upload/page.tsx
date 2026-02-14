@@ -119,9 +119,7 @@ export default function UploadPage() {
 
     const path = `${u.user.id}/${crypto.randomUUID()}-${file.name}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from("resources")
-      .upload(path, file);
+    const { error: uploadError } = await supabase.storage.from("resources").upload(path, file);
 
     if (uploadError) {
       setMsg(uploadError.message);
@@ -145,9 +143,7 @@ export default function UploadPage() {
     if (mode === "course") payload.course_id = courseId;
     else payload.major_id = majorId;
 
-    const { error: insertError } = await supabase
-      .from("resources")
-      .insert(payload);
+    const { error: insertError } = await supabase.from("resources").insert(payload);
 
     if (insertError) {
       await supabase.storage.from("resources").remove([path]);
@@ -164,35 +160,33 @@ export default function UploadPage() {
   }
 
   return (
-    <main className="max-w-2xl mx-auto p-6 space-y-6">
-
+    <main className="max-w-3xl mx-auto px-4 py-6 space-y-6 overflow-x-hidden">
       {/* HEADER */}
-      <div className="
+      <div
+        className="
         rounded-3xl p-6
         bg-gradient-to-br from-blue-50 via-white to-pink-50
         dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800
         border border-zinc-200 dark:border-zinc-800
-      ">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Upload Resource
-        </h1>
+      "
+      >
+        <h1 className="text-3xl font-semibold tracking-tight">Upload Resource</h1>
 
-        <p className="text-sm text-zinc-500 mt-1">
-          Earn credits when your upload is approved.
-        </p>
+        <p className="text-sm text-zinc-500 mt-1">Earn credits when your upload is approved.</p>
       </div>
 
-
       {/* FORM */}
-      <div className="
+      <div
+        className="
         rounded-3xl p-6 space-y-5
         bg-white/70 dark:bg-zinc-900/70
         backdrop-blur-xl
         border border-zinc-200 dark:border-zinc-800
-      ">
-
+        min-w-0
+      "
+      >
         {msg && (
-          <div className="text-sm px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800">
+          <div className="text-sm px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 break-words">
             {msg}
           </div>
         )}
@@ -201,10 +195,12 @@ export default function UploadPage() {
         <select
           value={collegeId}
           onChange={(e) => setCollegeId(e.target.value)}
-          className="input"
+          className="input w-full min-w-0"
         >
-          {colleges.map(c => (
-            <option key={c.id} value={c.id}>{c.name}</option>
+          {colleges.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
           ))}
         </select>
 
@@ -212,22 +208,25 @@ export default function UploadPage() {
         <select
           value={majorId}
           onChange={(e) => setMajorId(e.target.value)}
-          className="input"
+          className="input w-full min-w-0"
         >
-          {majors.map(m => (
-            <option key={m.id} value={m.id}>{m.name}</option>
+          {majors.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
           ))}
         </select>
 
         {/* Mode pills */}
-        <div className="flex gap-2">
-          {["course","major"].map(m => (
+        <div className="flex flex-wrap gap-2">
+          {["course", "major"].map((m) => (
             <button
               key={m}
               onClick={() => setMode(m as any)}
               className={`
                 px-4 py-2 rounded-full text-sm
                 border transition
+                whitespace-nowrap
                 ${mode === m
                   ? "bg-black text-white border-black dark:bg-white dark:text-black"
                   : "border-zinc-300 dark:border-zinc-700"}
@@ -243,9 +242,9 @@ export default function UploadPage() {
           <select
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
-            className="input"
+            className="input w-full min-w-0"
           >
-            {courses.map(c => (
+            {courses.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.code} — {c.name}
               </option>
@@ -255,13 +254,14 @@ export default function UploadPage() {
 
         {/* CATEGORY PILLS */}
         <div className="flex flex-wrap gap-2">
-          {categories.map(cat => (
+          {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setType(cat)}
               className={`
                 px-4 py-2 rounded-full text-sm
                 border transition
+                whitespace-nowrap
                 ${type === cat
                   ? "bg-black text-white border-black dark:bg-white dark:text-black"
                   : "border-zinc-300 dark:border-zinc-700"}
@@ -276,28 +276,32 @@ export default function UploadPage() {
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="input"
+          className="input w-full min-w-0"
         />
 
         <input
           type="number"
           value={pages}
           onChange={(e) => setPages(Number(e.target.value))}
-          className="input"
+          className="input w-full min-w-0"
         />
 
-        <div className="
+        <div
+          className="
           rounded-2xl px-4 py-3
           bg-gradient-to-r from-blue-100 to-pink-100
           dark:from-zinc-800 dark:to-zinc-700
           text-sm font-medium
-        ">
+          break-words
+        "
+        >
           Estimated reward: {estimatedCredits} credits
         </div>
 
         <input
           type="file"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+          className="w-full min-w-0"
         />
 
         <button
@@ -313,7 +317,6 @@ export default function UploadPage() {
         >
           {loading ? "Uploading..." : "Upload"}
         </button>
-
       </div>
     </main>
   );
