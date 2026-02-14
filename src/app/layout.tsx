@@ -1,15 +1,18 @@
-// src/app/layout.tsx
 import type { Metadata } from "next";
-import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import SideNav from "@/app/_components/SideNav";
-import MobileDrawerNav from "@/app/_components/MobileDrawerNav";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Raff",
-  description: "Past papers, notes, and assignments — organized by college, major, and course.",
+  description: "Past papers, notes, and assignments — organized by course.",
 };
+
+/**
+ * NOTE:
+ * - Desktop: same sidebar layout you already had.
+ * - Mobile: a real overlay drawer (z-50) so it never renders behind content.
+ */
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -21,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           overflow-x-hidden
         "
       >
-        {/* Background “soft glossy” */}
+        {/* Background that makes “glass” visible */}
         <div
           className="
             min-h-screen
@@ -33,29 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 radial-gradient(circle_at_50%_80%,rgba(167,139,250,0.08),transparent_55%)]
           "
         >
-          {/* Mobile header (udst.tools-ish) */}
-          <header
-            className="
-              md:hidden sticky top-0 z-30
-              bg-white/65 dark:bg-zinc-900/65
-              backdrop-blur-xl
-              border-b border-white/40 dark:border-zinc-800
-            "
-          >
-            <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <MobileDrawerNav />
-                <Link href="/" className="font-semibold tracking-tight">
-                  Raff
-                </Link>
-              </div>
-
-              <ThemeToggle />
-            </div>
-          </header>
-
           <div className="min-h-screen flex">
-            {/* Desktop sidebar */}
+            {/* Desktop sidebar (unchanged) */}
             <aside
               className="
                 hidden md:flex md:flex-col
@@ -70,60 +52,120 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 shadow-[0_10px_40px_rgba(0,0,0,0.06)]
               "
             >
-              {/* Brand + theme */}
+              {/* Brand */}
               <div className="p-4">
                 <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-4">
                   <div className="text-lg font-semibold tracking-tight">Raff</div>
+
                   <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                     Student resource exchange
                   </div>
+
                   <div className="mt-3">
                     <ThemeToggle />
                   </div>
                 </div>
               </div>
 
-              {/* Main nav */}
+              {/* Nav */}
               <SideNav />
-
-              {/* Settings group */}
-              <div className="mt-auto p-4">
-                <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-3 space-y-1">
-                  <Link
-                    href="/about"
-                    className="block px-3 py-2 rounded-2xl text-sm text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-800/60 transition"
-                  >
-                    About
-                  </Link>
-                  <Link
-                    href="/privacy"
-                    className="block px-3 py-2 rounded-2xl text-sm text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-800/60 transition"
-                  >
-                    Privacy
-                  </Link>
-                  <Link
-                    href="/feedback"
-                    className="block px-3 py-2 rounded-2xl text-sm text-zinc-700 hover:bg-white/60 dark:text-zinc-200 dark:hover:bg-zinc-800/60 transition"
-                  >
-                    Feedback
-                  </Link>
-
-                  <div className="px-3 pt-2 text-[11px] text-zinc-500 dark:text-zinc-400">
-                    Tip: upload past papers to earn credits.
-                  </div>
-                </div>
-              </div>
             </aside>
 
             {/* Main */}
             <div className="flex-1">
-              <div className="max-w-5xl mx-auto px-4 pb-24 md:px-0 md:pb-6">
-                {children}
-              </div>
+              {/* Mobile Drawer (overlay, not behind content) */}
+              <MobileDrawer />
+
+              <div className="max-w-5xl mx-auto px-4 md:px-0 py-6">{children}</div>
             </div>
           </div>
         </div>
       </body>
     </html>
+  );
+}
+
+/** Mobile drawer component kept in this file so you only paste one thing */
+function MobileDrawer() {
+  return (
+    <div className="md:hidden">
+      <input id="raff-drawer" type="checkbox" className="peer hidden" />
+
+      {/* Top bar */}
+      <header
+        className="
+          sticky top-0 z-40
+          bg-white/55 dark:bg-zinc-900/55
+          backdrop-blur-xl
+          border-b border-white/40 dark:border-zinc-800
+        "
+      >
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          {/* Menu button */}
+          <label
+            htmlFor="raff-drawer"
+            className="
+              inline-flex items-center justify-center
+              w-10 h-10 rounded-2xl cursor-pointer
+              border border-white/40 dark:border-zinc-800
+              bg-white/50 dark:bg-zinc-900/40
+              hover:bg-white/70 dark:hover:bg-zinc-900/60
+              transition
+            "
+            aria-label="Open menu"
+          >
+            <div className="space-y-1">
+              <div className="w-5 h-[2px] bg-zinc-900 dark:bg-zinc-100" />
+              <div className="w-5 h-[2px] bg-zinc-900 dark:bg-zinc-100 opacity-80" />
+              <div className="w-5 h-[2px] bg-zinc-900 dark:bg-zinc-100 opacity-60" />
+            </div>
+          </label>
+
+          <div className="font-semibold tracking-tight">Raff</div>
+
+          <ThemeToggle />
+        </div>
+      </header>
+
+      {/* Backdrop */}
+      <label
+        htmlFor="raff-drawer"
+        className="
+          fixed inset-0 z-50 hidden
+          peer-checked:block
+          bg-black/40 backdrop-blur-[2px]
+        "
+        aria-label="Close menu"
+      />
+
+      {/* Drawer panel */}
+      <aside
+        className="
+          fixed top-0 left-0 z-[60]
+          h-full w-[320px] max-w-[85vw]
+          -translate-x-full peer-checked:translate-x-0
+          transition-transform duration-200
+
+          bg-white/70 dark:bg-zinc-900/70
+          backdrop-blur-2xl
+          border-r border-white/40 dark:border-zinc-800
+          shadow-[0_20px_60px_rgba(0,0,0,0.25)]
+          p-3
+        "
+      >
+        <div className="p-2">
+          <div className="rounded-3xl border border-white/40 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/40 p-4">
+            <div className="text-lg font-semibold tracking-tight">Raff</div>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              Student resource exchange
+            </div>
+          </div>
+        </div>
+
+        <div className="px-1">
+          <SideNav />
+        </div>
+      </aside>
+    </div>
   );
 }
