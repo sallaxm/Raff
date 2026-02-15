@@ -248,10 +248,8 @@ export default function UploadPage() {
       }
 
       // Page count: use detected pages (pdf/docx) else null (mod can set later)
-      const pageCount = detectedPages ?? null;
-
-      // Cost still needs to be set. If no pages detected, keep it minimal (1).
-      const cost = pageCount ? Math.max(1, Math.ceil(pageCount / 5)) : 1;
+      const pageCount = detectedPages ?? 1; // ✅ never null (DB requires NOT NULL)
+      const cost = Math.max(1, Math.ceil(pageCount / 5));
 
       const payload: any = {
         institution_id: "udst",
