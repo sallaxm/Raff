@@ -96,7 +96,6 @@ export default async function HomePage() {
 
             <p className="text-zinc-600 dark:text-zinc-300 max-w-xl">
               Past papers, notes, assignments — organized by college, major, and course.
-              Built for UDST Engineering.
             </p>
 
             <div className="mt-4 max-w-md">

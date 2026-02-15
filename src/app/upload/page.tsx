@@ -129,7 +129,7 @@ export default function UploadPage() {
 
     const payload: any = {
       institution_id: "udst",
-      uploader_id: u.user.id,
+      //uploader_id: u.user.id,
       title: title.trim(),
       type,
       cost: Math.max(1, Math.ceil(pages / 5)),
@@ -232,7 +232,7 @@ export default function UploadPage() {
                   : "border-zinc-300 dark:border-zinc-700"}
               `}
             >
-              {m === "course" ? "Course Upload" : "General Major"}
+              {m === "course" ? "Upload to Specific Course" : "Upload to Major"}
             </button>
           ))}
         </div>
