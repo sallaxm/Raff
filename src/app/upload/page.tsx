@@ -17,6 +17,38 @@ const categories = [
   "Other",
 ];
 
+function estimatePagesFromText(text: string) {
+  // Rough, but stable: ~350 words/page
+  const words = (text.trim().match(/\S+/g) ?? []).length;
+  return Math.max(1, Math.ceil(words / 350));
+}
+
+async function countPdfPages(file: File): Promise<number | null> {
+  try {
+    // Requires: npm i pdf-lib
+    const { PDFDocument } = await import("pdf-lib");
+    const buf = await file.arrayBuffer();
+    const pdf = await PDFDocument.load(buf);
+    return pdf.getPageCount();
+  } catch {
+    return null;
+  }
+}
+
+async function estimateDocxPages(file: File): Promise<number | null> {
+  try {
+    // Requires: npm i mammoth
+    const mammoth = await import("mammoth/mammoth.browser");
+    const buf = await file.arrayBuffer();
+    const res = await mammoth.extractRawText({ arrayBuffer: buf as any });
+    const text = res?.value ?? "";
+    if (!text.trim()) return null;
+    return estimatePagesFromText(text);
+  } catch {
+    return null;
+  }
+}
+
 export default function UploadPage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
 
@@ -35,24 +67,29 @@ export default function UploadPage() {
 
   const [title, setTitle] = useState("");
   const [type, setType] = useState("Past Paper");
-  const [pages, setPages] = useState(5);
   const [file, setFile] = useState<File | null>(null);
 
-  const estimatedCredits = Math.max(1, Math.round(pages / 2));
+  // auto page count
+  const [pageCount, setPageCount] = useState<number | null>(null);
+  const [pageNote, setPageNote] = useState<string>("");
+
+  // reward is based on pages if known, otherwise minimum
+  const estimatedCredits = pageCount ? Math.max(1, Math.round(pageCount / 2)) : 1;
 
   // Load colleges
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("colleges")
         .select("id,name")
         .eq("institution_id", "udst")
         .order("name");
 
-      if (data) {
-        setColleges(data);
-        if (data.length) setCollegeId(data[0].id);
-      }
+      if (error) return;
+
+      const list = (data ?? []) as College[];
+      setColleges(list);
+      if (list.length) setCollegeId(list[0].id);
     }
 
     load();
@@ -63,16 +100,22 @@ export default function UploadPage() {
     if (!collegeId) return;
 
     async function loadMajors() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("majors")
         .select("id,name")
         .eq("college_id", collegeId)
         .order("name");
 
-      if (data) {
-        setMajors(data);
-        setMajorId(data[0]?.id ?? "");
-      }
+      if (error) return;
+
+      const list = (data ?? []) as Major[];
+      setMajors(list);
+      const nextMajorId = list[0]?.id ?? "";
+      setMajorId(nextMajorId);
+
+      // reset dependent course state
+      setCourses([]);
+      setCourseId("");
     }
 
     loadMajors();
@@ -83,21 +126,90 @@ export default function UploadPage() {
     if (!majorId) return;
 
     async function loadCourses() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("major_courses")
         .select("courses(id,code,name)")
         .eq("major_id", majorId);
 
-      if (!data) return;
+      if (error) return;
 
-      const list = data.map((x: any) => x.courses).filter(Boolean);
+      const list = (data ?? [])
+        .map((x: any) => x?.courses)
+        .filter(Boolean) as Course[];
 
       setCourses(list);
-      setCourseId(list[0]?.id ?? "");
+
+      // only set if there is one
+      if (list.length > 0) setCourseId(list[0].id);
+      else setCourseId("");
     }
 
     loadCourses();
   }, [majorId, supabase]);
+
+  // When switching to major mode, make sure course selection cannot “ghost render”
+  useEffect(() => {
+    if (mode === "major") {
+      setCourses([]);
+      setCourseId("");
+    }
+  }, [mode]);
+
+  // Auto count pages when file changes
+  useEffect(() => {
+    (async () => {
+      setPageCount(null);
+      setPageNote("");
+      if (!file) return;
+
+      const name = file.name.toLowerCase();
+      const ext = name.split(".").pop() ?? "";
+
+      // 500MB guard (client-side)
+      const maxBytes = 500 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setMsg("File too large. Max size is 500MB.");
+        setFile(null);
+        return;
+      }
+
+      if (ext === "pdf") {
+        const n = await countPdfPages(file);
+        if (typeof n === "number") {
+          setPageCount(n);
+          setPageNote("");
+        } else {
+          setPageCount(null);
+          setPageNote("Install pdf-lib to enable PDF page counting.");
+        }
+        return;
+      }
+
+      if (ext === "docx") {
+        const n = await estimateDocxPages(file);
+        if (typeof n === "number") {
+          setPageCount(n);
+          setPageNote("Estimated from text (docx).");
+        } else {
+          setPageCount(null);
+          setPageNote("Install mammoth to enable DOCX page estimating.");
+        }
+        return;
+      }
+
+      // .doc (legacy) is not reliably parseable in-browser
+      if (ext === "doc") {
+        setPageCount(null);
+        setPageNote("DOC page count not supported (use PDF/DOCX).");
+        return;
+      }
+
+      // zip or other types
+      setPageCount(null);
+      setPageNote("");
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [file]);
 
   async function upload() {
     setMsg("");
@@ -127,9 +239,12 @@ export default function UploadPage() {
       return;
     }
 
+    // If we couldn't count pages, fall back to 1
+    const pages = pageCount ?? 1;
+
     const payload: any = {
       institution_id: "udst",
-      //uploader_id: u.user.id,
+      uploader_id: u.user.id,
       title: title.trim(),
       type,
       cost: Math.max(1, Math.ceil(pages / 5)),
@@ -140,8 +255,9 @@ export default function UploadPage() {
       major_id: null,
     };
 
-    if (mode === "course") payload.course_id = courseId;
-    else payload.major_id = majorId;
+    // IMPORTANT: never send empty strings to uuid columns
+    if (mode === "course" && courseId) payload.course_id = courseId;
+    else if (majorId) payload.major_id = majorId;
 
     const { error: insertError } = await supabase.from("resources").insert(payload);
 
@@ -154,8 +270,10 @@ export default function UploadPage() {
 
     setMsg("Uploaded ✅ Pending approval.");
     setTitle("");
+    setType("Past Paper");
     setFile(null);
-    setPages(5);
+    setPageCount(null);
+    setPageNote("");
     setLoading(false);
   }
 
@@ -171,7 +289,6 @@ export default function UploadPage() {
       "
       >
         <h1 className="text-3xl font-semibold tracking-tight">Upload Resource</h1>
-
         <p className="text-sm text-zinc-500 mt-1">Earn credits when your upload is approved.</p>
       </div>
 
@@ -222,6 +339,7 @@ export default function UploadPage() {
           {["course", "major"].map((m) => (
             <button
               key={m}
+              type="button"
               onClick={() => setMode(m as any)}
               className={`
                 px-4 py-2 rounded-full text-sm
@@ -237,8 +355,8 @@ export default function UploadPage() {
           ))}
         </div>
 
-        {/* Course */}
-        {mode === "course" && (
+        {/* Course (only when needed AND has data) */}
+        {mode === "course" && courses.length > 0 && (
           <select
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
@@ -257,6 +375,7 @@ export default function UploadPage() {
           {categories.map((cat) => (
             <button
               key={cat}
+              type="button"
               onClick={() => setType(cat)}
               className={`
                 px-4 py-2 rounded-full text-sm
@@ -279,29 +398,30 @@ export default function UploadPage() {
           className="input w-full min-w-0"
         />
 
-        <input
-          type="number"
-          value={pages}
-          onChange={(e) => setPages(Number(e.target.value))}
-          className="input w-full min-w-0"
-        />
-
         <div
           className="
-          rounded-2xl px-4 py-3
-          bg-gradient-to-r from-blue-100 to-pink-100
-          dark:from-zinc-800 dark:to-zinc-700
-          text-sm font-medium
-          break-words
-        "
+            rounded-2xl px-4 py-3
+            bg-gradient-to-r from-blue-100 to-pink-100
+            dark:from-zinc-800 dark:to-zinc-700
+            text-sm font-medium
+            break-words
+          "
         >
-          Estimated reward: {estimatedCredits} credits
+          Pages:{" "}
+          <span className="font-semibold">
+            {pageCount ?? "—"}
+          </span>
+          {pageNote ? <span className="ml-2 text-xs font-normal opacity-80">({pageNote})</span> : null}
+          <div className="mt-1 text-xs font-normal opacity-80">
+            Estimated reward: {estimatedCredits} credits
+          </div>
         </div>
 
         <input
           type="file"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="w-full min-w-0"
+          accept=".pdf,.doc,.docx,.zip"
         />
 
         <button
