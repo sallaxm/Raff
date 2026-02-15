@@ -17,36 +17,59 @@ const categories = [
   "Other",
 ];
 
-function estimatePagesFromText(text: string) {
-  // Rough, but stable: ~350 words/page
-  const words = (text.trim().match(/\S+/g) ?? []).length;
-  return Math.max(1, Math.ceil(words / 350));
-}
+// Allow lots of types. Page counting only attempted for PDF + DOCX.
+const ACCEPT =
+  ".pdf,.docx,.pptx,.xlsx,.txt,.md,.zip,.rar,.7z,.png,.jpg,.jpeg,.webp";
 
 async function countPdfPages(file: File): Promise<number | null> {
   try {
-    // Requires: npm i pdf-lib
-    const { PDFDocument } = await import("pdf-lib");
+    // pdfjs-dist works client-side
+    const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf");
+    // Worker setup (CDN). If this fails in some environments, we just fallback to null.
+    try {
+      pdfjs.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+    } catch {}
+
     const buf = await file.arrayBuffer();
-    const pdf = await PDFDocument.load(buf);
-    return pdf.getPageCount();
+    const doc = await pdfjs.getDocument({ data: buf }).promise;
+    return typeof doc.numPages === "number" ? doc.numPages : null;
   } catch {
     return null;
   }
 }
 
-async function estimateDocxPages(file: File): Promise<number | null> {
+async function countDocxPages(file: File): Promise<number | null> {
   try {
-    // Requires: npm i mammoth
-    const mammoth = await import("mammoth/mammoth.browser");
+    // Mammoth doesn't reliably give "pages" (Word pages are layout-dependent),
+    // so we use a heuristic: estimate pages based on word count.
+    // If you later want, we can move this to server for better parsing.
+    const mammoth: any = await import("mammoth/mammoth.browser");
+
     const buf = await file.arrayBuffer();
-    const res = await mammoth.extractRawText({ arrayBuffer: buf as any });
-    const text = res?.value ?? "";
-    if (!text.trim()) return null;
-    return estimatePagesFromText(text);
+    const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
+    const words = String(value || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+
+    if (!words) return null;
+
+    // Heuristic: ~350 words/page (rough). Clamp min 1.
+    return Math.max(1, Math.round(words / 350));
   } catch {
     return null;
   }
+}
+
+async function detectPages(file: File): Promise<number | null> {
+  const name = file.name.toLowerCase();
+
+  if (name.endsWith(".pdf")) return await countPdfPages(file);
+  if (name.endsWith(".docx")) return await countDocxPages(file);
+
+  // Could add pptx/xlsx heuristics later if you want.
+  return null;
 }
 
 export default function UploadPage() {
@@ -69,12 +92,9 @@ export default function UploadPage() {
   const [type, setType] = useState("Past Paper");
   const [file, setFile] = useState<File | null>(null);
 
-  // auto page count
-  const [pageCount, setPageCount] = useState<number | null>(null);
-  const [pageNote, setPageNote] = useState<string>("");
-
-  // reward is based on pages if known, otherwise minimum
-  const estimatedCredits = pageCount ? Math.max(1, Math.round(pageCount / 2)) : 1;
+  const [detectedPages, setDetectedPages] = useState<number | null>(null);
+  const estimatedCredits =
+    detectedPages == null ? null : Math.max(1, Math.round(detectedPages / 2));
 
   // Load colleges
   useEffect(() => {
@@ -85,7 +105,10 @@ export default function UploadPage() {
         .eq("institution_id", "udst")
         .order("name");
 
-      if (error) return;
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
 
       const list = (data ?? []) as College[];
       setColleges(list);
@@ -95,7 +118,7 @@ export default function UploadPage() {
     load();
   }, [supabase]);
 
-  // Load majors
+  // Load majors when college changes
   useEffect(() => {
     if (!collegeId) return;
 
@@ -106,14 +129,15 @@ export default function UploadPage() {
         .eq("college_id", collegeId)
         .order("name");
 
-      if (error) return;
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
 
       const list = (data ?? []) as Major[];
       setMajors(list);
-      const nextMajorId = list[0]?.id ?? "";
-      setMajorId(nextMajorId);
-
-      // reset dependent course state
+      setMajorId(list[0]?.id ?? "");
+      // reset course list when switching college
       setCourses([]);
       setCourseId("");
     }
@@ -121,7 +145,7 @@ export default function UploadPage() {
     loadMajors();
   }, [collegeId, supabase]);
 
-  // Load courses
+  // Load courses when major changes (only relevant if mode === "course")
   useEffect(() => {
     if (!majorId) return;
 
@@ -131,150 +155,136 @@ export default function UploadPage() {
         .select("courses(id,code,name)")
         .eq("major_id", majorId);
 
-      if (error) return;
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
 
       const list = (data ?? [])
-        .map((x: any) => x?.courses)
+        .map((x: any) => x.courses)
         .filter(Boolean) as Course[];
 
-      setCourses(list);
+      // Sort nicely
+      list.sort((a, b) => (a.code || "").localeCompare(b.code || ""));
 
-      // only set if there is one
-      if (list.length > 0) setCourseId(list[0].id);
-      else setCourseId("");
+      setCourses(list);
+      setCourseId(list[0]?.id ?? "");
     }
 
     loadCourses();
   }, [majorId, supabase]);
 
-  // When switching to major mode, make sure course selection cannot “ghost render”
+  // When mode changes to "major", clear course selection (so no useless empty list)
   useEffect(() => {
     if (mode === "major") {
-      setCourses([]);
       setCourseId("");
+    } else {
+      // if switching back to course mode, pick first course if available
+      setCourseId((prev) => prev || courses[0]?.id || "");
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode]);
 
-  // Auto count pages when file changes
+  // When file changes, try detect pages
   useEffect(() => {
-    (async () => {
-      setPageCount(null);
-      setPageNote("");
+    let cancelled = false;
+
+    async function run() {
+      setDetectedPages(null);
       if (!file) return;
 
-      const name = file.name.toLowerCase();
-      const ext = name.split(".").pop() ?? "";
+      const pages = await detectPages(file);
+      if (!cancelled) setDetectedPages(pages);
+    }
 
-      // 500MB guard (client-side)
-      const maxBytes = 500 * 1024 * 1024;
-      if (file.size > maxBytes) {
-        setMsg("File too large. Max size is 500MB.");
-        setFile(null);
-        return;
-      }
-
-      if (ext === "pdf") {
-        const n = await countPdfPages(file);
-        if (typeof n === "number") {
-          setPageCount(n);
-          setPageNote("");
-        } else {
-          setPageCount(null);
-          setPageNote("Install pdf-lib to enable PDF page counting.");
-        }
-        return;
-      }
-
-      if (ext === "docx") {
-        const n = await estimateDocxPages(file);
-        if (typeof n === "number") {
-          setPageCount(n);
-          setPageNote("Estimated from text (docx).");
-        } else {
-          setPageCount(null);
-          setPageNote("Install mammoth to enable DOCX page estimating.");
-        }
-        return;
-      }
-
-      // .doc (legacy) is not reliably parseable in-browser
-      if (ext === "doc") {
-        setPageCount(null);
-        setPageNote("DOC page count not supported (use PDF/DOCX).");
-        return;
-      }
-
-      // zip or other types
-      setPageCount(null);
-      setPageNote("");
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    run();
+    return () => {
+      cancelled = true;
+    };
   }, [file]);
 
   async function upload() {
     setMsg("");
     setLoading(true);
 
-    const { data: u } = await supabase.auth.getUser();
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) {
+        setMsg("Login first.");
+        return;
+      }
 
-    if (!u.user) {
-      setMsg("Login first.");
+      if (!file) {
+        setMsg("Choose a file.");
+        return;
+      }
+
+      const cleanTitle = title.trim();
+      if (!cleanTitle) {
+        setMsg("Title is required.");
+        return;
+      }
+
+      if (!collegeId || !majorId) {
+        setMsg("Pick a college and major.");
+        return;
+      }
+
+      if (mode === "course" && !courseId) {
+        setMsg("Pick a course (or switch to General Major).");
+        return;
+      }
+
+      const path = `${u.user.id}/${crypto.randomUUID()}-${file.name}`;
+
+      // Upload file first
+      const { error: uploadError } = await supabase.storage
+        .from("resources")
+        .upload(path, file, { upsert: false });
+
+      if (uploadError) {
+        setMsg(uploadError.message);
+        return;
+      }
+
+      // Page count: use detected pages (pdf/docx) else null (mod can set later)
+      const pageCount = detectedPages ?? null;
+
+      // Cost still needs to be set. If no pages detected, keep it minimal (1).
+      const cost = pageCount ? Math.max(1, Math.ceil(pageCount / 5)) : 1;
+
+      const payload: any = {
+        institution_id: "udst",
+        uploader_id: u.user.id,
+        title: cleanTitle,
+        type,
+        cost,
+        page_count: pageCount,
+        storage_path: path,
+        status: "pending",
+        course_id: null,
+        major_id: null,
+      };
+
+      if (mode === "course") payload.course_id = courseId;
+      else payload.major_id = majorId;
+
+      const { error: insertError } = await supabase.from("resources").insert(payload);
+
+      if (insertError) {
+        // if DB fails, delete uploaded file
+        await supabase.storage.from("resources").remove([path]);
+        setMsg(insertError.message);
+        return;
+      }
+
+      setMsg("Uploaded ✅ Pending approval.");
+      setTitle("");
+      setFile(null);
+      setDetectedPages(null);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (!file) {
-      setMsg("Choose a file.");
-      setLoading(false);
-      return;
-    }
-
-    const path = `${u.user.id}/${crypto.randomUUID()}-${file.name}`;
-
-    const { error: uploadError } = await supabase.storage.from("resources").upload(path, file);
-
-    if (uploadError) {
-      setMsg(uploadError.message);
-      setLoading(false);
-      return;
-    }
-
-    // If we couldn't count pages, fall back to 1
-    const pages = pageCount ?? 1;
-
-    const payload: any = {
-      institution_id: "udst",
-      uploader_id: u.user.id,
-      title: title.trim(),
-      type,
-      cost: Math.max(1, Math.ceil(pages / 5)),
-      page_count: pages,
-      storage_path: path,
-      status: "pending",
-      course_id: null,
-      major_id: null,
-    };
-
-    // IMPORTANT: never send empty strings to uuid columns
-    if (mode === "course" && courseId) payload.course_id = courseId;
-    else if (majorId) payload.major_id = majorId;
-
-    const { error: insertError } = await supabase.from("resources").insert(payload);
-
-    if (insertError) {
-      await supabase.storage.from("resources").remove([path]);
-      setMsg(insertError.message);
-      setLoading(false);
-      return;
-    }
-
-    setMsg("Uploaded ✅ Pending approval.");
-    setTitle("");
-    setType("Past Paper");
-    setFile(null);
-    setPageCount(null);
-    setPageNote("");
-    setLoading(false);
   }
 
   return (
@@ -282,25 +292,27 @@ export default function UploadPage() {
       {/* HEADER */}
       <div
         className="
-        rounded-3xl p-6
-        bg-gradient-to-br from-blue-50 via-white to-pink-50
-        dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800
-        border border-zinc-200 dark:border-zinc-800
-      "
+          rounded-3xl p-6
+          bg-gradient-to-br from-blue-50 via-white to-pink-50
+          dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800
+          border border-zinc-200 dark:border-zinc-800
+        "
       >
         <h1 className="text-3xl font-semibold tracking-tight">Upload Resource</h1>
-        <p className="text-sm text-zinc-500 mt-1">Earn credits when your upload is approved.</p>
+        <p className="text-sm text-zinc-500 mt-1">
+          Earn credits when your upload is approved.
+        </p>
       </div>
 
       {/* FORM */}
       <div
         className="
-        rounded-3xl p-6 space-y-5
-        bg-white/70 dark:bg-zinc-900/70
-        backdrop-blur-xl
-        border border-zinc-200 dark:border-zinc-800
-        min-w-0
-      "
+          rounded-3xl p-6 space-y-5
+          bg-white/70 dark:bg-zinc-900/70
+          backdrop-blur-xl
+          border border-zinc-200 dark:border-zinc-800
+          min-w-0
+        "
       >
         {msg && (
           <div className="text-sm px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 break-words">
@@ -343,20 +355,21 @@ export default function UploadPage() {
               onClick={() => setMode(m as any)}
               className={`
                 px-4 py-2 rounded-full text-sm
-                border transition
-                whitespace-nowrap
-                ${mode === m
-                  ? "bg-black text-white border-black dark:bg-white dark:text-black"
-                  : "border-zinc-300 dark:border-zinc-700"}
+                border transition whitespace-nowrap
+                ${
+                  mode === m
+                    ? "bg-black text-white border-black dark:bg-white dark:text-black"
+                    : "border-zinc-300 dark:border-zinc-700"
+                }
               `}
             >
-              {m === "course" ? "Upload to Specific Course" : "Upload to Major"}
+              {m === "course" ? "Course Upload" : "General Major"}
             </button>
           ))}
         </div>
 
-        {/* Course (only when needed AND has data) */}
-        {mode === "course" && courses.length > 0 && (
+        {/* Course (ONLY show if course mode) */}
+        {mode === "course" && (
           <select
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
@@ -379,11 +392,12 @@ export default function UploadPage() {
               onClick={() => setType(cat)}
               className={`
                 px-4 py-2 rounded-full text-sm
-                border transition
-                whitespace-nowrap
-                ${type === cat
-                  ? "bg-black text-white border-black dark:bg-white dark:text-black"
-                  : "border-zinc-300 dark:border-zinc-700"}
+                border transition whitespace-nowrap
+                ${
+                  type === cat
+                    ? "bg-black text-white border-black dark:bg-white dark:text-black"
+                    : "border-zinc-300 dark:border-zinc-700"
+                }
               `}
             >
               {cat}
@@ -398,6 +412,7 @@ export default function UploadPage() {
           className="input w-full min-w-0"
         />
 
+        {/* Estimated reward (pages auto-detected when possible) */}
         <div
           className="
             rounded-2xl px-4 py-3
@@ -407,21 +422,21 @@ export default function UploadPage() {
             break-words
           "
         >
-          Pages:{" "}
-          <span className="font-semibold">
-            {pageCount ?? "—"}
-          </span>
-          {pageNote ? <span className="ml-2 text-xs font-normal opacity-80">({pageNote})</span> : null}
-          <div className="mt-1 text-xs font-normal opacity-80">
-            Estimated reward: {estimatedCredits} credits
-          </div>
+          {detectedPages == null ? (
+            <span>Estimated reward: <span className="opacity-70">TBD (auto-detect for PDF/DOCX)</span></span>
+          ) : (
+            <span>
+              Estimated reward: {estimatedCredits} credits{" "}
+              <span className="opacity-70">• {detectedPages} pages detected</span>
+            </span>
+          )}
         </div>
 
         <input
           type="file"
+          accept={ACCEPT}
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className="w-full min-w-0"
-          accept=".pdf,.doc,.docx,.zip"
         />
 
         <button
