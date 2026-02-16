@@ -28,7 +28,7 @@ async function countPdfPages(file: File): Promise<number | null> {
     // Worker setup (CDN). If this fails in some environments, we just fallback to null.
     try {
       pdfjs.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
     } catch {}
 
     const buf = await file.arrayBuffer();

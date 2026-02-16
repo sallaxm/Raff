@@ -83,16 +83,12 @@ export default function ModPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function approve(id: string) {
-    setMsg("");
-    const { error } = await supabase.rpc("approve_resource", { p_resource_id: id });
-    if (error) return setMsg(error.message);
-    setMsg("Approved ✅");
-    setEditingId(null);
-    setDraft(null);
-    setOpenPreviewId(null);
-    load();
-  }
+  async function approve(id: string, reward?: number) {
+  await supabase.rpc("approve_resource_with_reward", {
+    p_resource_id: id,
+    p_reward_override: reward ?? null,
+  });
+}
 
   async function reject(id: string) {
     setMsg("");
