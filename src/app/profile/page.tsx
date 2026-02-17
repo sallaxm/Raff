@@ -252,7 +252,7 @@ export default function ProfilePage() {
       <div className="space-y-3">
 
         <h2 className="text-xl font-semibold">
-          Bought Resources
+          Downloaded Resources
         </h2>
 
         {purchases.map((purchase) => (
@@ -292,7 +292,7 @@ export default function ProfilePage() {
 
         {purchases.length === 0 && (
           <p className="text-zinc-500">
-            No bought resources yet.
+            No downloaded resources yet.
           </p>
         )}
 
