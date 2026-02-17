@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { User } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type Resource = {
@@ -10,21 +11,30 @@ type Resource = {
   rejected_reason: string | null;
 };
 
+type DownloadedResource = {
+  id: string;
+  created_at: string;
+  resources: {
+    id: string;
+    title: string;
+    type: string;
+  } | null;
+};
+
+
 export default function ProfilePage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [email, setEmail] = useState("");
   const [credits, setCredits] = useState<number>(0);
   const [uploads, setUploads] = useState<Resource[]>([]);
+  const [purchases, setPurchases] = useState<DownloadedResource[]>([]);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  async function load() {
+  const load = useCallback(async () => {
     const { data } = await supabase.auth.getUser();
 
     if (!data.user) return;
@@ -47,7 +57,29 @@ export default function ProfilePage() {
       .order("created_at", { ascending: false });
 
     setUploads(resources ?? []);
-  }
+
+    const { data: downloads } = await supabase
+      .from("downloads")
+      .select(
+        `
+        id,
+        created_at,
+        resources ( id, title, type )
+      `
+      )
+      .eq("user_id", data.user.id)
+      .order("created_at", { ascending: false });
+
+    setPurchases((downloads ?? []) as DownloadedResource[]);
+  }, [supabase]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void load();
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, [load]);
 
   async function login() {
     setMsg("");
@@ -69,6 +101,29 @@ export default function ProfilePage() {
   async function logout() {
     await supabase.auth.signOut();
     location.reload();
+  }
+
+  async function redownload(resourceId: string) {
+    setMsg("");
+    setDownloadingId(resourceId);
+
+    const res = await fetch(`/api/download/${resourceId}`);
+    const json = await res.json();
+
+    setDownloadingId(null);
+
+    if (!res.ok) {
+      setMsg(json.error || "Could not start download");
+      return;
+    }
+
+    const newTab = window.open(json.url, "_blank", "noopener,noreferrer");
+    if (!newTab) {
+      setMsg("Could not open a new tab. Please allow popups and try again.");
+      return;
+    }
+
+    setMsg("Opened your file in a new tab.");
   }
 
   // ✅ NOT LOGGED IN
@@ -165,6 +220,56 @@ export default function ProfilePage() {
         </button>
       </div>
 
+
+      {/* Bought resources */}
+      <div className="space-y-3">
+
+        <h2 className="text-xl font-semibold">
+          Bought Resources
+        </h2>
+
+        {purchases.map((purchase) => (
+          <div
+            key={purchase.id}
+            className="
+              rounded-2xl p-4
+              border border-zinc-200 dark:border-zinc-800
+              bg-white dark:bg-zinc-900
+            "
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-medium">
+                  {purchase.resources?.title ?? "Resource"}
+                </p>
+
+                <p className="text-xs text-zinc-500 mt-1">
+                  {purchase.resources?.type ?? "Unknown type"} • Bought {new Date(purchase.created_at).toLocaleDateString()}
+                </p>
+              </div>
+
+              <button
+                onClick={() => purchase.resources?.id && redownload(purchase.resources.id)}
+                disabled={!purchase.resources?.id || downloadingId === purchase.resources.id}
+                className="
+                  shrink-0 px-4 py-2 rounded-xl text-sm
+                  bg-black text-white dark:bg-white dark:text-black
+                  disabled:opacity-50
+                "
+              >
+                {downloadingId === purchase.resources?.id ? "Opening..." : "Download again"}
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {purchases.length === 0 && (
+          <p className="text-zinc-500">
+            No bought resources yet.
+          </p>
+        )}
+
+      </div>
 
       {/* Uploads */}
       <div className="space-y-3">
