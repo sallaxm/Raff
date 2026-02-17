@@ -22,7 +22,21 @@ export async function middleware(request: NextRequest) {
   );
 
   // Important: forces session refresh + cookie sync when needed
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { pathname, search } = request.nextUrl;
+  const protectedRoutes = ["/upload", "/credits", "/mod"];
+  const isProtected = protectedRoutes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+
+  if (isProtected && !user) {
+    const redirectUrl = new URL("/profile", request.url);
+    redirectUrl.searchParams.set("next", `${pathname}${search}`);
+    return NextResponse.redirect(redirectUrl);
+  }
 
   return response;
 }

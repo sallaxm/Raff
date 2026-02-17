@@ -53,17 +53,21 @@ export default function ProfilePage() {
     setMsg("");
     setSending(true);
 
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+      window.location.origin;
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: "http://localhost:3000",
+        emailRedirectTo: `${baseUrl}/auth/callback`,
       },
     });
 
     setSending(false);
 
     if (error) setMsg(error.message);
-    else setMsg("Magic link sent ✉️ Check your email.");
+    else setMsg("Magic link sent. Check your email.");
   }
 
   async function logout() {
@@ -71,7 +75,7 @@ export default function ProfilePage() {
     location.reload();
   }
 
-  // ✅ NOT LOGGED IN
+  // NOT LOGGED IN
   if (!user) {
     return (
       <main className="max-w-md mx-auto p-8">
@@ -131,7 +135,7 @@ export default function ProfilePage() {
     );
   }
 
-  // ✅ LOGGED IN
+  // LOGGED IN
   return (
     <main className="max-w-3xl mx-auto p-8 space-y-6">
 
