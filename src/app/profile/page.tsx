@@ -135,6 +135,31 @@ export default function ProfilePage() {
     location.reload();
   }
 
+  async function signup() {
+    setMsg("");
+
+    if (!email || !password) {
+      setMsg("Please enter both email and password.");
+      return;
+    }
+
+    setSending(true);
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    setSending(false);
+
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    setMsg("Account created. Check your email to confirm, then log in.");
+  }
+
   async function logout() {
     await supabase.auth.signOut();
     location.reload();
@@ -212,20 +237,36 @@ export default function ProfilePage() {
             "
           />
 
-          <button
-            onClick={login}
-            disabled={sending}
-            className="
-              w-full mt-4 py-3 rounded-2xl
-              bg-black text-white
-              dark:bg-white dark:text-black
-              font-medium
-              hover:scale-[1.01] transition
-              disabled:opacity-50
-            "
-          >
-            {sending ? "Signing in..." : "Login"}
-          </button>
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              onClick={login}
+              disabled={sending}
+              className="
+                py-3 rounded-2xl
+                bg-black text-white
+                dark:bg-white dark:text-black
+                font-medium
+                hover:scale-[1.01] transition
+                disabled:opacity-50
+              "
+            >
+              {sending ? "Working..." : "Login"}
+            </button>
+
+            <button
+              onClick={signup}
+              disabled={sending}
+              className="
+                py-3 rounded-2xl
+                border border-zinc-300 dark:border-zinc-700
+                font-medium
+                hover:bg-zinc-100 dark:hover:bg-zinc-800 transition
+                disabled:opacity-50
+              "
+            >
+              {sending ? "Working..." : "Sign up"}
+            </button>
+          </div>
 
           {msg && (
             <p className="text-sm mt-4 text-zinc-500">
