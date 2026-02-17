@@ -50,6 +50,7 @@ export default function ProfilePage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [activeTab, setActiveTab] = useState<"uploads" | "downloaded">("uploads");
 
   const load = useCallback(async () => {
     const { data } = await supabase.auth.getUser();
@@ -248,123 +249,118 @@ export default function ProfilePage() {
       </div>
 
 
-      {/* Downloaded resources */}
-      <div id="downloaded-resources" className="space-y-3 scroll-mt-24">
-
-        <h2 className="text-xl font-semibold">
-          Downloaded Resources
-        </h2>
-
-        <p className="text-sm text-zinc-500">
-          Resources you already bought will appear here for re-download.
-        </p>
-
-        {purchases.map((purchase) => (
-          <div
-            key={purchase.id}
-            className="
-              rounded-2xl p-4
-              border border-zinc-200 dark:border-zinc-800
-              bg-white dark:bg-zinc-900
-            "
+      {/* Library tabs */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 w-fit bg-white dark:bg-zinc-900">
+          <button
+            onClick={() => setActiveTab("uploads")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+              activeTab === "uploads"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "text-zinc-600 dark:text-zinc-300"
+            }`}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-medium">
-                  {purchase.resources?.title ?? "Resource"}
-                </p>
+            My Uploads
+          </button>
 
-                <p className="text-xs text-zinc-500 mt-1">
-                  {purchase.resources?.type ?? "Unknown type"} • Bought {new Date(purchase.created_at).toLocaleDateString()}
-                </p>
-              </div>
+          <button
+            onClick={() => setActiveTab("downloaded")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+              activeTab === "downloaded"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "text-zinc-600 dark:text-zinc-300"
+            }`}
+          >
+            Downloaded
+          </button>
+        </div>
 
-              <button
-                onClick={() => purchase.resources?.id && redownload(purchase.resources.id)}
-                disabled={!purchase.resources?.id || downloadingId === purchase.resources.id}
+        {activeTab === "downloaded" ? (
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold">Downloaded Resources</h2>
+
+            {purchases.map((purchase) => (
+              <div
+                key={purchase.id}
                 className="
-                  shrink-0 px-4 py-2 rounded-xl text-sm
-                  bg-black text-white dark:bg-white dark:text-black
-                  disabled:opacity-50
+                  rounded-2xl p-4
+                  border border-zinc-200 dark:border-zinc-800
+                  bg-white dark:bg-zinc-900
                 "
               >
-                {downloadingId === purchase.resources?.id ? "Opening..." : "Download again"}
-              </button>
-            </div>
-          </div>
-        ))}
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-medium">{purchase.resources?.title ?? "Resource"}</p>
 
-        {purchases.length === 0 && (
-          <p className="text-zinc-500">
-            No downloaded resources yet.
-          </p>
-        )}
+                    <p className="text-xs text-zinc-500 mt-1">
+                      {purchase.resources?.type ?? "Unknown type"} • Bought {new Date(purchase.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
 
-      </div>
-
-      {/* Uploads */}
-      <div className="space-y-3">
-
-        <h2 className="text-xl font-semibold">
-          My Uploads
-        </h2>
-
-        {uploads.map((u) => {
-
-          const statusStyles = {
-            approved:
-              "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
-
-            pending:
-              "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40",
-
-            rejected:
-              "bg-red-100 text-red-700 dark:bg-red-900/40",
-          };
-
-          return (
-            <div
-              key={u.id}
-              className="
-                rounded-2xl p-4
-                border border-zinc-200 dark:border-zinc-800
-                bg-white dark:bg-zinc-900
-              "
-            >
-              <div className="flex justify-between">
-
-                <p className="font-medium">
-                  {u.title}
-                </p>
-
-                <div
-                  className={`
-                    px-3 py-1 rounded-full text-xs font-medium
-                    ${statusStyles[u.status as keyof typeof statusStyles]}
-                  `}
-                >
-                  {u.status}
+                  <button
+                    onClick={() => purchase.resources?.id && redownload(purchase.resources.id)}
+                    disabled={!purchase.resources?.id || downloadingId === purchase.resources.id}
+                    className="
+                      shrink-0 px-4 py-2 rounded-xl text-sm
+                      bg-black text-white dark:bg-white dark:text-black
+                      disabled:opacity-50
+                    "
+                  >
+                    {downloadingId === purchase.resources?.id ? "Opening..." : "Download again"}
+                  </button>
                 </div>
-
               </div>
+            ))}
 
-              {u.status === "rejected" && u.rejected_reason && (
-                <p className="text-xs text-red-500 mt-2">
-                  Reason: {u.rejected_reason}
-                </p>
-              )}
+            {purchases.length === 0 && (
+              <p className="text-zinc-500">No downloaded resources yet.</p>
+            )}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <h2 className="text-xl font-semibold">My Uploads</h2>
 
-            </div>
-          );
-        })}
+            {uploads.map((u) => {
+              const statusStyles = {
+                approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
+                pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40",
+                rejected: "bg-red-100 text-red-700 dark:bg-red-900/40",
+              };
 
-        {uploads.length === 0 && (
-          <p className="text-zinc-500">
-            No uploads yet.
-          </p>
+              return (
+                <div
+                  key={u.id}
+                  className="
+                    rounded-2xl p-4
+                    border border-zinc-200 dark:border-zinc-800
+                    bg-white dark:bg-zinc-900
+                  "
+                >
+                  <div className="flex justify-between">
+                    <p className="font-medium">{u.title}</p>
+
+                    <div
+                      className={`
+                        px-3 py-1 rounded-full text-xs font-medium
+                        ${statusStyles[u.status as keyof typeof statusStyles]}
+                      `}
+                    >
+                      {u.status}
+                    </div>
+                  </div>
+
+                  {u.status === "rejected" && u.rejected_reason && (
+                    <p className="text-xs text-red-500 mt-2">Reason: {u.rejected_reason}</p>
+                  )}
+                </div>
+              );
+            })}
+
+            {uploads.length === 0 && <p className="text-zinc-500">No uploads yet.</p>}
+          </div>
         )}
-
       </div>
+
 
     </main>
   );

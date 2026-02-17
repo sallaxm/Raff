@@ -88,7 +88,6 @@ export default function SideNav() {
       <Section title="ACCOUNT" />
       <NavItem href="/credits" label="Credits" />
       <NavItem href="/profile" label="Profile" />
-      <NavItem href="/profile#downloaded-resources" label="Downloaded" />
 
       {/* INFO */}
       <Section title="INFO" />
