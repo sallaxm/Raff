@@ -21,6 +21,23 @@ type DownloadedResource = {
   } | null;
 };
 
+type DownloadRow = {
+  id: string;
+  created_at: string;
+  resources:
+    | {
+        id: string;
+        title: string;
+        type: string;
+      }
+    | {
+        id: string;
+        title: string;
+        type: string;
+      }[]
+    | null;
+};
+
 
 export default function ProfilePage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
@@ -70,7 +87,17 @@ export default function ProfilePage() {
       .eq("user_id", data.user.id)
       .order("created_at", { ascending: false });
 
-    setPurchases((downloads ?? []) as DownloadedResource[]);
+    const normalizedPurchases: DownloadedResource[] = (downloads ?? []).map(
+      (download: DownloadRow) => ({
+        id: download.id,
+        created_at: download.created_at,
+        resources: Array.isArray(download.resources)
+          ? (download.resources[0] ?? null)
+          : download.resources,
+      })
+    );
+
+    setPurchases(normalizedPurchases);
   }, [supabase]);
 
   useEffect(() => {
