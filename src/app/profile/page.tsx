@@ -248,12 +248,16 @@ export default function ProfilePage() {
       </div>
 
 
-      {/* Bought resources */}
-      <div className="space-y-3">
+      {/* Downloaded resources */}
+      <div id="downloaded-resources" className="space-y-3 scroll-mt-24">
 
         <h2 className="text-xl font-semibold">
           Downloaded Resources
         </h2>
+
+        <p className="text-sm text-zinc-500">
+          Resources you already bought will appear here for re-download.
+        </p>
 
         {purchases.map((purchase) => (
           <div
