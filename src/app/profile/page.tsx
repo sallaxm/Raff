@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
@@ -41,10 +42,14 @@ type DownloadRow = {
 
 export default function ProfilePage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
+  const searchParams = useSearchParams();
+  const showResetForm = searchParams.get("reset") === "1";
 
   const [user, setUser] = useState<User | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [credits, setCredits] = useState<number>(0);
   const [uploads, setUploads] = useState<Resource[]>([]);
   const [purchases, setPurchases] = useState<DownloadedResource[]>([]);
@@ -204,7 +209,7 @@ export default function ProfilePage() {
       window.location.origin;
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${baseUrl}/auth/callback?next=/reset-password`,
+      redirectTo: `${baseUrl}/auth/callback?next=/profile?reset=1`,
     });
 
     setSending(false);
@@ -227,6 +232,47 @@ export default function ProfilePage() {
 
     setResetCooldownSeconds(60);
     setMsg("Password reset link sent. Check your inbox/spam.");
+  }
+
+
+  async function saveNewPassword() {
+    setMsg("");
+
+    if (!newPassword || !confirmNewPassword) {
+      setMsg("Please fill both new password fields.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setMsg("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      setMsg("New passwords do not match.");
+      return;
+    }
+
+    setSending(true);
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    setSending(false);
+
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    setNewPassword("");
+    setConfirmNewPassword("");
+    setMsg("Password updated successfully.");
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete("reset");
+    window.history.replaceState({}, "", nextUrl.toString());
   }
 
   async function logout() {
@@ -275,6 +321,12 @@ export default function ProfilePage() {
           <p className="text-sm text-zinc-500 mt-1">
             Login with your university email and password.
           </p>
+
+          {showResetForm && (
+            <p className="text-sm mt-3 text-blue-600 dark:text-blue-300">
+              Reset link opened. Once you are logged in, set your new password below.
+            </p>
+          )}
 
           <input
             type="email"
@@ -394,6 +446,63 @@ export default function ProfilePage() {
         </button>
       </div>
 
+
+      {showResetForm && (
+        <div className="
+          rounded-3xl p-6
+          bg-gradient-to-br from-blue-50 via-white to-pink-50
+          dark:from-zinc-900 dark:to-zinc-800
+          border border-zinc-200 dark:border-zinc-800
+        ">
+          <h2 className="text-2xl font-semibold">Set new password</h2>
+          <p className="text-sm text-zinc-500 mt-1">Enter your new password and save it.</p>
+
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="
+              mt-4 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmNewPassword}
+            onChange={(e) => setConfirmNewPassword(e.target.value)}
+            className="
+              mt-3 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <button
+            onClick={saveNewPassword}
+            disabled={sending}
+            className="
+              w-full mt-4 py-3 rounded-2xl
+              bg-black text-white
+              dark:bg-white dark:text-black
+              font-medium
+              hover:scale-[1.01] transition
+              disabled:opacity-50
+            "
+          >
+            {sending ? "Saving..." : "Update password"}
+          </button>
+        </div>
+      )}
 
       {/* Library tabs */}
       <div className="space-y-4 rounded-3xl p-4 border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/70">
