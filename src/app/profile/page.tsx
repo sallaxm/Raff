@@ -187,7 +187,7 @@ export default function ProfilePage() {
       window.location.origin;
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${baseUrl}/reset-password`,
+      redirectTo: `${baseUrl}/auth/callback?next=/reset-password`,
     });
 
     setSending(false);
