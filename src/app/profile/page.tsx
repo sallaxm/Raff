@@ -216,8 +216,11 @@ export default function ProfilePage() {
   }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   // NOT LOGGED IN
 =======
+=======
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab
   async function redownload(resourceId: string) {
     setMsg("");
     setDownloadingId(resourceId);
