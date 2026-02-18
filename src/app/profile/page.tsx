@@ -51,6 +51,7 @@ export default function ProfilePage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [resetCooldownSeconds, setResetCooldownSeconds] = useState(0);
   const [activeTab, setActiveTab] = useState<"uploads" | "downloaded">("uploads");
 
   const load = useCallback(async () => {
@@ -109,6 +110,17 @@ export default function ProfilePage() {
 
     return () => clearTimeout(timer);
   }, [load]);
+
+
+  useEffect(() => {
+    if (resetCooldownSeconds <= 0) return;
+
+    const timer = window.setInterval(() => {
+      setResetCooldownSeconds((seconds) => (seconds <= 1 ? 0 : seconds - 1));
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [resetCooldownSeconds]);
 
   async function login() {
     setMsg("");
@@ -180,6 +192,11 @@ export default function ProfilePage() {
       return;
     }
 
+    if (resetCooldownSeconds > 0) {
+      setMsg(`Please wait ${resetCooldownSeconds}s before requesting another reset email.`);
+      return;
+    }
+
     setSending(true);
 
     const baseUrl =
@@ -193,10 +210,22 @@ export default function ProfilePage() {
     setSending(false);
 
     if (error) {
+      const status = (error as { status?: number }).status;
+      const message = error.message.toLowerCase();
+
+      if (status === 429 || message.includes("rate limit")) {
+        setResetCooldownSeconds(60);
+        setMsg(
+          "Too many reset requests right now. Please wait a minute and try again. If this keeps happening, increase the Auth email rate limit in your Supabase dashboard."
+        );
+        return;
+      }
+
       setMsg(error.message);
       return;
     }
 
+    setResetCooldownSeconds(60);
     setMsg("Password reset link sent. Check your inbox/spam.");
   }
 
@@ -310,14 +339,14 @@ export default function ProfilePage() {
 
           <button
             onClick={resetPassword}
-            disabled={sending}
+            disabled={sending || resetCooldownSeconds > 0}
             className="
               mt-3 text-sm underline underline-offset-4
               text-zinc-600 dark:text-zinc-300
               disabled:opacity-50
             "
           >
-            {sending ? "Working..." : "Reset password"}
+            {sending ? "Working..." : resetCooldownSeconds > 0 ? `Reset password (${resetCooldownSeconds}s)` : "Reset password"}
           </button>
 
           {msg && (
