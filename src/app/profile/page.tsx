@@ -368,8 +368,13 @@ export default function ProfilePage() {
 
 
       {/* Library tabs */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 w-fit bg-white dark:bg-zinc-900">
+      <div className="space-y-4 rounded-3xl p-4 border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/70">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">My Library</h2>
+          <p className="text-xs text-zinc-500">Switch between uploads and downloaded files</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-900">
           <button
             onClick={() => setActiveTab("uploads")}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
@@ -378,7 +383,7 @@ export default function ProfilePage() {
                 : "text-zinc-600 dark:text-zinc-300"
             }`}
           >
-            My Uploads
+            My Uploads ({uploads.length})
           </button>
 
           <button
@@ -389,14 +394,12 @@ export default function ProfilePage() {
                 : "text-zinc-600 dark:text-zinc-300"
             }`}
           >
-            Downloaded
+            Downloaded ({purchases.length})
           </button>
         </div>
 
         {activeTab === "downloaded" ? (
           <div className="space-y-3">
-            <h2 className="text-xl font-semibold">Downloaded Resources</h2>
-
             {purchases.map((purchase) => (
               <div
                 key={purchase.id}
@@ -436,8 +439,6 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="space-y-3">
-            <h2 className="text-xl font-semibold">My Uploads</h2>
-
             {uploads.map((u) => {
               const statusStyles = {
                 approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
