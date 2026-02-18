@@ -168,6 +168,31 @@ export default function ProfilePage() {
     setMsg("Confirmation link sent. Check your inbox/spam, then log in.");
   }
 
+
+  async function resetPassword() {
+    setMsg("");
+
+    if (!email) {
+      setMsg("Enter your email first, then click Reset password.");
+      return;
+    }
+
+    setSending(true);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/profile`,
+    });
+
+    setSending(false);
+
+    if (error) {
+      setMsg(error.message);
+      return;
+    }
+
+    setMsg("Password reset link sent. Check your inbox/spam.");
+  }
+
   async function logout() {
     await supabase.auth.signOut();
     location.reload();
@@ -275,6 +300,18 @@ export default function ProfilePage() {
               {sending ? "Working..." : "Sign up"}
             </button>
           </div>
+
+          <button
+            onClick={resetPassword}
+            disabled={sending}
+            className="
+              mt-3 text-sm underline underline-offset-4
+              text-zinc-600 dark:text-zinc-300
+              disabled:opacity-50
+            "
+          >
+            {sending ? "Working..." : "Reset password"}
+          </button>
 
           {msg && (
             <p className="text-sm mt-4 text-zinc-500">
