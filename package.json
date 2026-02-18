@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3000",
-    "build": "next build",
+    "build": "npm run check:merge-markers && next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "check:merge-markers": "node scripts/check-merge-conflicts.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

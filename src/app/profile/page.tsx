@@ -121,6 +121,7 @@ export default function ProfilePage() {
     setSending(true);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     const baseUrl =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
       window.location.origin;
@@ -129,6 +130,9 @@ export default function ProfilePage() {
 =======
     const { error } = await supabase.auth.signInWithPassword({
 >>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
+=======
+    const { error } = await supabase.auth.signInWithPassword({
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
       email,
       password,
     });
@@ -153,24 +157,38 @@ export default function ProfilePage() {
 
     setSending(true);
 
+<<<<<<< HEAD
+=======
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+      window.location.origin;
+
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
 <<<<<<< HEAD
+<<<<<<< HEAD
         emailRedirectTo: `${baseUrl}/auth/callback`,
 =======
         emailRedirectTo: `${window.location.origin}/auth/callback`,
 >>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
+=======
+        emailRedirectTo: `${baseUrl}/auth/callback`,
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
       },
     });
 
     setSending(false);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     if (error) setMsg(error.message);
     else setMsg("Magic link sent. Check your email.");
 =======
+=======
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
     if (error) {
       setMsg(error.message);
       return;
@@ -195,8 +213,17 @@ export default function ProfilePage() {
 
     setSending(true);
 
+<<<<<<< HEAD
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/profile`,
+=======
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
+      window.location.origin;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${baseUrl}/reset-password`,
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
     });
 
     setSending(false);
@@ -207,7 +234,10 @@ export default function ProfilePage() {
     }
 
     setMsg("Password reset link sent. Check your inbox/spam.");
+<<<<<<< HEAD
 >>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
+=======
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
   }
 
   async function logout() {
@@ -217,10 +247,13 @@ export default function ProfilePage() {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
   // NOT LOGGED IN
 =======
 =======
 >>>>>>> origin/codex/open-downloaded-files-in-new-tab
+=======
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
   async function redownload(resourceId: string) {
     setMsg("");
     setDownloadingId(resourceId);
@@ -384,6 +417,7 @@ export default function ProfilePage() {
 
 
       {/* Library tabs */}
+<<<<<<< HEAD
       <div className="space-y-4">
         <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 w-fit bg-white dark:bg-zinc-900">
           <button
@@ -401,10 +435,24 @@ export default function ProfilePage() {
             onClick={() => setActiveTab("downloaded")}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
               activeTab === "downloaded"
+=======
+      <div className="space-y-4 rounded-3xl p-4 border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/70">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">My Library</h2>
+          <p className="text-xs text-zinc-500">Switch between uploads and downloaded files</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-900">
+          <button
+            onClick={() => setActiveTab("uploads")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+              activeTab === "uploads"
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
                 ? "bg-black text-white dark:bg-white dark:text-black"
                 : "text-zinc-600 dark:text-zinc-300"
             }`}
           >
+<<<<<<< HEAD
             Downloaded
           </button>
         </div>
@@ -413,6 +461,25 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <h2 className="text-xl font-semibold">Downloaded Resources</h2>
 
+=======
+            My Uploads ({uploads.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab("downloaded")}
+            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
+              activeTab === "downloaded"
+                ? "bg-black text-white dark:bg-white dark:text-black"
+                : "text-zinc-600 dark:text-zinc-300"
+            }`}
+          >
+            Downloaded ({purchases.length})
+          </button>
+        </div>
+
+        {activeTab === "downloaded" ? (
+          <div className="space-y-3">
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
             {purchases.map((purchase) => (
               <div
                 key={purchase.id}
@@ -452,6 +519,7 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="space-y-3">
+<<<<<<< HEAD
             <h2 className="text-xl font-semibold">My Uploads</h2>
 
             {uploads.map((u) => {
@@ -473,6 +541,27 @@ export default function ProfilePage() {
                   <div className="flex justify-between">
                     <p className="font-medium">{u.title}</p>
 
+=======
+            {uploads.map((u) => {
+              const statusStyles = {
+                approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
+                pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40",
+                rejected: "bg-red-100 text-red-700 dark:bg-red-900/40",
+              };
+
+              return (
+                <div
+                  key={u.id}
+                  className="
+                    rounded-2xl p-4
+                    border border-zinc-200 dark:border-zinc-800
+                    bg-white dark:bg-zinc-900
+                  "
+                >
+                  <div className="flex justify-between">
+                    <p className="font-medium">{u.title}</p>
+
+>>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
                     <div
                       className={`
                         px-3 py-1 rounded-full text-xs font-medium
