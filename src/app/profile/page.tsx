@@ -145,9 +145,12 @@ export default function ProfilePage() {
 
     setSending(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
 
     setSending(false);
@@ -157,7 +160,12 @@ export default function ProfilePage() {
       return;
     }
 
-    setMsg("Account created. Check your email to confirm, then log in.");
+    if (!data.user?.identities?.length) {
+      setMsg("This email is already registered. Try Login or reset your password.");
+      return;
+    }
+
+    setMsg("Confirmation link sent. Check your inbox/spam, then log in.");
   }
 
   async function logout() {
