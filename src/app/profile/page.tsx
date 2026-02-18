@@ -51,6 +51,11 @@ export default function ProfilePage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [changeCurrentPassword, setChangeCurrentPassword] = useState("");
+  const [changeNewPassword, setChangeNewPassword] = useState("");
+  const [changeConfirmPassword, setChangeConfirmPassword] = useState("");
+  const [changePasswordMsg, setChangePasswordMsg] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"uploads" | "downloaded">("uploads");
 
   const load = useCallback(async () => {
@@ -203,6 +208,64 @@ export default function ProfilePage() {
   async function logout() {
     await supabase.auth.signOut();
     location.reload();
+  }
+
+  async function changePassword() {
+    setChangePasswordMsg("");
+
+    if (!user?.email) {
+      setChangePasswordMsg("Could not verify your account email. Please try again.");
+      return;
+    }
+
+    if (!changeCurrentPassword || !changeNewPassword || !changeConfirmPassword) {
+      setChangePasswordMsg("Please fill all password fields.");
+      return;
+    }
+
+    if (changeNewPassword.length < 6) {
+      setChangePasswordMsg("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (changeNewPassword !== changeConfirmPassword) {
+      setChangePasswordMsg("New passwords do not match.");
+      return;
+    }
+
+    if (changeCurrentPassword === changeNewPassword) {
+      setChangePasswordMsg("New password must be different from current password.");
+      return;
+    }
+
+    setChangingPassword(true);
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: changeCurrentPassword,
+    });
+
+    if (signInError) {
+      setChangingPassword(false);
+      setChangePasswordMsg("Current password is incorrect.");
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: changeNewPassword,
+    });
+
+    setChangingPassword(false);
+
+    if (updateError) {
+      setChangePasswordMsg(updateError.message);
+      return;
+    }
+
+    setChangeCurrentPassword("");
+    setChangeNewPassword("");
+    setChangeConfirmPassword("");
+    setChangePasswordMsg("Password updated successfully.");
   }
 
   async function redownload(resourceId: string) {
@@ -363,6 +426,74 @@ export default function ProfilePage() {
         >
           Logout
         </button>
+
+        <div className="mt-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 bg-white/70 dark:bg-zinc-900/70">
+          <h2 className="text-lg font-semibold">Change password</h2>
+          <p className="text-xs text-zinc-500 mt-1">Update your password while signed in.</p>
+
+          <input
+            type="password"
+            placeholder="Current password"
+            value={changeCurrentPassword}
+            onChange={(e) => setChangeCurrentPassword(e.target.value)}
+            className="
+              mt-4 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <input
+            type="password"
+            placeholder="New password"
+            value={changeNewPassword}
+            onChange={(e) => setChangeNewPassword(e.target.value)}
+            className="
+              mt-3 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={changeConfirmPassword}
+            onChange={(e) => setChangeConfirmPassword(e.target.value)}
+            className="
+              mt-3 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <button
+            onClick={changePassword}
+            disabled={changingPassword}
+            className="
+              mt-4 px-4 py-2 rounded-xl
+              bg-black text-white
+              dark:bg-white dark:text-black
+              font-medium
+              disabled:opacity-50
+            "
+          >
+            {changingPassword ? "Updating..." : "Update password"}
+          </button>
+
+          {changePasswordMsg && (
+            <p className="text-sm mt-3 text-zinc-500">{changePasswordMsg}</p>
+          )}
+        </div>
       </div>
 
 
