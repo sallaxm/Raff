@@ -188,7 +188,7 @@ export default function ProfilePage() {
       window.location.origin;
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${baseUrl}/profile`,
+      redirectTo: `${baseUrl}/reset-password`,
     });
 
     setSending(false);
