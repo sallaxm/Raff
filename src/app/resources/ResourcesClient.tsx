@@ -106,8 +106,13 @@ export default function ResourcesPage() {
     const json = await res.json();
     if (!res.ok) return setMsg(json.error || "Could not start download");
 
-    window.location.href = json.url;
-    setMsg("Starting download…");
+    const newTab = window.open(json.url, "_blank", "noopener,noreferrer");
+    if (!newTab) {
+      setMsg("Download started, but your browser blocked opening a new tab.");
+      return;
+    }
+
+    setMsg("Starting download in a new tab…");
   }
 
   return (
