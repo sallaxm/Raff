@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 export default function ResetPasswordPage() {
@@ -9,10 +9,79 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [msg, setMsg] = useState("");
+  const [ready, setReady] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function prepareRecoverySession() {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+        if (error) {
+          if (!active) return;
+          setMsg("This reset link is invalid or expired. Please request a new one.");
+          setReady(false);
+          return;
+        }
+
+        window.history.replaceState({}, "", "/reset-password");
+      }
+
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      const accessToken = hash.get("access_token");
+      const refreshToken = hash.get("refresh_token");
+      const type = hash.get("type");
+
+      if (accessToken && refreshToken && type === "recovery") {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (error) {
+          if (!active) return;
+          setMsg("This reset link is invalid or expired. Please request a new one.");
+          setReady(false);
+          return;
+        }
+
+        window.history.replaceState({}, "", "/reset-password");
+      }
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!active) return;
+
+      if (!session) {
+        setMsg("Open this page from your reset email link, or request a new reset link.");
+        setReady(false);
+        return;
+      }
+
+      setReady(true);
+    }
+
+    void prepareRecoverySession();
+
+    return () => {
+      active = false;
+    };
+  }, [supabase]);
 
   async function savePassword() {
     setMsg("");
+
+    if (!ready) {
+      setMsg("Please open a valid reset link first.");
+      return;
+    }
 
     if (!password || !confirmPassword) {
       setMsg("Please fill both password fields.");
@@ -58,7 +127,7 @@ export default function ResetPasswordPage() {
         <h1 className="text-3xl font-semibold">Set new password</h1>
 
         <p className="text-sm text-zinc-500 mt-1">
-          Opened from reset link? Enter your new password below.
+          Open this page from your reset email, then set a new password.
         </p>
 
         <input
@@ -93,7 +162,7 @@ export default function ResetPasswordPage() {
 
         <button
           onClick={savePassword}
-          disabled={saving}
+          disabled={saving || !ready}
           className="
             w-full mt-4 py-3 rounded-2xl
             bg-black text-white
