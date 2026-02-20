@@ -21,10 +21,38 @@ const categories = [
 const ACCEPT =
   ".pdf,.docx,.pptx,.xlsx,.txt,.md,.zip,.rar,.7z,.png,.jpg,.jpeg,.webp";
 
+type PdfJsModule = {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (source: { data: ArrayBuffer }) => { promise: Promise<{ numPages?: number }> };
+};
+
+type MammothModule = {
+  extractRawText: (input: { arrayBuffer: ArrayBuffer }) => Promise<{ value?: string }>;
+};
+
+type MajorCourseJoinRow = {
+  courses: Course | null;
+};
+
+type UploadMode = "course" | "major";
+
+type ResourceInsert = {
+  institution_id: string;
+  uploader_id: string;
+  title: string;
+  type: string;
+  cost: number;
+  page_count: number;
+  storage_path: string;
+  status: "pending";
+  course_id: string | null;
+  major_id: string | null;
+};
+
 async function countPdfPages(file: File): Promise<number | null> {
   try {
     // pdfjs-dist works client-side
-    const pdfjs: any = await import("pdfjs-dist/legacy/build/pdf");
+    const pdfjs = (await import("pdfjs-dist/legacy/build/pdf")) as unknown as PdfJsModule;
     // Worker setup (CDN). If this fails in some environments, we just fallback to null.
     try {
       pdfjs.GlobalWorkerOptions.workerSrc =
@@ -44,7 +72,7 @@ async function countDocxPages(file: File): Promise<number | null> {
     // Mammoth doesn't reliably give "pages" (Word pages are layout-dependent),
     // so we use a heuristic: estimate pages based on word count.
     // If you later want, we can move this to server for better parsing.
-    const mammoth: any = await import("mammoth/mammoth.browser");
+    const mammoth = (await import("mammoth/mammoth.browser")) as unknown as MammothModule;
 
     const buf = await file.arrayBuffer();
     const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
@@ -86,7 +114,7 @@ export default function UploadPage() {
   const [majorId, setMajorId] = useState("");
   const [courseId, setCourseId] = useState("");
 
-  const [mode, setMode] = useState<"course" | "major">("course");
+  const [mode, setMode] = useState<UploadMode>("course");
 
   const [title, setTitle] = useState("");
   const [type, setType] = useState("Past Paper");
@@ -160,9 +188,9 @@ export default function UploadPage() {
         return;
       }
 
-      const list = (data ?? [])
-        .map((x: any) => x.courses)
-        .filter(Boolean) as Course[];
+      const list = ((data ?? []) as MajorCourseJoinRow[])
+        .map((x) => x.courses)
+        .filter((course): course is Course => Boolean(course));
 
       // Sort nicely
       list.sort((a, b) => (a.code || "").localeCompare(b.code || ""));
@@ -251,7 +279,7 @@ export default function UploadPage() {
       const pageCount = detectedPages ?? 1; // ✅ never null (DB requires NOT NULL)
       const cost = Math.max(1, Math.ceil(pageCount / 5));
 
-      const payload: any = {
+      const payload: ResourceInsert = {
         institution_id: "udst",
         uploader_id: u.user.id,
         title: cleanTitle,
@@ -346,11 +374,11 @@ export default function UploadPage() {
 
         {/* Mode pills */}
         <div className="flex flex-wrap gap-2">
-          {["course", "major"].map((m) => (
+          {(["course", "major"] as UploadMode[]).map((m) => (
             <button
               key={m}
               type="button"
-              onClick={() => setMode(m as any)}
+              onClick={() => setMode(m)}
               className={`
                 px-4 py-2 rounded-full text-sm
                 border transition whitespace-nowrap

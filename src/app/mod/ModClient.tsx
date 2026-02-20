@@ -48,7 +48,7 @@ export default function ModClient() {
       .limit(100);
 
     if (error) setMsg(error.message);
-    setRows((data as any[]) ?? []);
+    setRows((data ?? []) as Row[]);
     setLoading(false);
   }
 

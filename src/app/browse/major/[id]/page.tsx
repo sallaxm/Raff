@@ -43,5 +43,5 @@ export default async function MajorPage({
   }
 
   // Pass to client for search/filtering
-  return <MajorCoursesClient majorName={major.name} rows={(data as any[]) ?? []} />;
+  return <MajorCoursesClient majorName={major.name} rows={(data ?? [])} />;
 }

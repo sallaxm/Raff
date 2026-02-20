@@ -2,6 +2,16 @@ import Link from "next/link";
 import HomeSearch from "./_components/HomeSearch";
 import { supabaseServer } from "@/lib/supabase/server";
 
+type LatestResource = {
+  id: string;
+  title: string;
+  type: string;
+  cost: number;
+  page_count: number | null;
+  created_at: string;
+  courses: { code: string; name: string } | null;
+};
+
 function timeAgo(iso: string) {
   const d = new Date(iso).getTime();
   const now = Date.now();
@@ -54,6 +64,8 @@ export default async function HomePage() {
     .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(12);
+
+  const latestRows = (latest ?? []) as LatestResource[];
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
@@ -180,7 +192,7 @@ export default async function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {(latest ?? []).map((r: any) => (
+          {latestRows.map((r) => (
             <Link
               key={r.id}
               href="/resources"
