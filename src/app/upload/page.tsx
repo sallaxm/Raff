@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
-type College = { id: string; name: string };
+type College = { id: string; name: string; institution_id: string };
 type Major = { id: string; name: string };
 type Course = { id: string; code: string; name: string };
 
@@ -124,13 +124,18 @@ export default function UploadPage() {
   const estimatedCredits =
     detectedPages == null ? null : Math.max(1, Math.round(detectedPages / 2));
 
+  const selectedCollege = useMemo(
+    () => colleges.find((college) => college.id === collegeId) ?? null,
+    [collegeId, colleges]
+  );
+
   // Load colleges
   useEffect(() => {
     async function load() {
       const { data, error } = await supabase
         .from("colleges")
-        .select("id,name")
-        .eq("institution_id", "udst")
+        .select("id,name,institution_id")
+        .order("institution_id")
         .order("name");
 
       if (error) {
@@ -258,6 +263,11 @@ export default function UploadPage() {
         return;
       }
 
+      if (!selectedCollege) {
+        setMsg("Invalid college selection.");
+        return;
+      }
+
       if (mode === "course" && !courseId) {
         setMsg("Pick a course (or switch to General Major).");
         return;
@@ -280,7 +290,7 @@ export default function UploadPage() {
       const cost = Math.max(1, Math.ceil(pageCount / 5));
 
       const payload: ResourceInsert = {
-        institution_id: "udst",
+        institution_id: selectedCollege.institution_id,
         uploader_id: u.user.id,
         title: cleanTitle,
         type,

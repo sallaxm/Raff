@@ -7,7 +7,7 @@ export default async function BrowsePage() {
   const { data: colleges, error } = await supabase
     .from("colleges")
     .select("id, slug, name, institution_id")
-    .eq("institution_id", "udst")
+    .order("institution_id")
     .order("name");
 
   if (error) return <main className="p-6">Error: {error.message}</main>;
@@ -29,7 +29,7 @@ export default async function BrowsePage() {
             "
           >
             <div className="text-lg font-semibold">{c.name}</div>
-            <div className="text-sm text-zinc-500">UDST</div>
+            <div className="text-sm text-zinc-500">{c.institution_id.toUpperCase()}</div>
           </Link>
         ))}
       </div>
