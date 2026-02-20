@@ -36,9 +36,17 @@ export async function GET(request: NextRequest) {
 
   // If profile is missing (common after resets), create it automatically:
   if (pErr) {
+    const { data: defaultInstitution } = await supabase
+      .from("institutions")
+      .select("id")
+      .eq("status", "active")
+      .order("id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
     await supabase.from("profiles").insert({
       id: user.id,
-      institution_id: "udst",
+      institution_id: defaultInstitution?.id ?? "udst",
       role: "user",
       credits: 8,
     });
