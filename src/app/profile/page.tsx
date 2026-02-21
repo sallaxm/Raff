@@ -51,6 +51,11 @@ export default function ProfilePage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
   const [sending, setSending] = useState(false);
+  const [changeCurrentPassword, setChangeCurrentPassword] = useState("");
+  const [changeNewPassword, setChangeNewPassword] = useState("");
+  const [changeConfirmPassword, setChangeConfirmPassword] = useState("");
+  const [changePasswordMsg, setChangePasswordMsg] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"uploads" | "downloaded">("uploads");
 
   const load = useCallback(async () => {
@@ -119,20 +124,7 @@ export default function ProfilePage() {
     }
 
     setSending(true);
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-      window.location.origin;
-
-    const { error } = await supabase.auth.signInWithOtp({
-=======
     const { error } = await supabase.auth.signInWithPassword({
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
-=======
-    const { error } = await supabase.auth.signInWithPassword({
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
       email,
       password,
     });
@@ -157,38 +149,20 @@ export default function ProfilePage() {
 
     setSending(true);
 
-<<<<<<< HEAD
-=======
     const baseUrl =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
       window.location.origin;
 
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-<<<<<<< HEAD
-<<<<<<< HEAD
         emailRedirectTo: `${baseUrl}/auth/callback`,
-=======
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
-=======
-        emailRedirectTo: `${baseUrl}/auth/callback`,
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
       },
     });
 
     setSending(false);
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-    if (error) setMsg(error.message);
-    else setMsg("Magic link sent. Check your email.");
-=======
-=======
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
     if (error) {
       setMsg(error.message);
       return;
@@ -213,17 +187,12 @@ export default function ProfilePage() {
 
     setSending(true);
 
-<<<<<<< HEAD
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/profile`,
-=======
     const baseUrl =
       process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
       window.location.origin;
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${baseUrl}/reset-password`,
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
+      redirectTo: `${baseUrl}/auth/callback?next=/reset-password`,
     });
 
     setSending(false);
@@ -234,10 +203,6 @@ export default function ProfilePage() {
     }
 
     setMsg("Password reset link sent. Check your inbox/spam.");
-<<<<<<< HEAD
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
-=======
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
   }
 
   async function logout() {
@@ -245,15 +210,64 @@ export default function ProfilePage() {
     location.reload();
   }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-  // NOT LOGGED IN
-=======
-=======
->>>>>>> origin/codex/open-downloaded-files-in-new-tab
-=======
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
+  async function changePassword() {
+    setChangePasswordMsg("");
+
+    if (!user?.email) {
+      setChangePasswordMsg("Could not verify your account email. Please try again.");
+      return;
+    }
+
+    if (!changeCurrentPassword || !changeNewPassword || !changeConfirmPassword) {
+      setChangePasswordMsg("Please fill all password fields.");
+      return;
+    }
+
+    if (changeNewPassword.length < 6) {
+      setChangePasswordMsg("New password must be at least 6 characters.");
+      return;
+    }
+
+    if (changeNewPassword !== changeConfirmPassword) {
+      setChangePasswordMsg("New passwords do not match.");
+      return;
+    }
+
+    if (changeCurrentPassword === changeNewPassword) {
+      setChangePasswordMsg("New password must be different from current password.");
+      return;
+    }
+
+    setChangingPassword(true);
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: changeCurrentPassword,
+    });
+
+    if (signInError) {
+      setChangingPassword(false);
+      setChangePasswordMsg("Current password is incorrect.");
+      return;
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: changeNewPassword,
+    });
+
+    setChangingPassword(false);
+
+    if (updateError) {
+      setChangePasswordMsg(updateError.message);
+      return;
+    }
+
+    setChangeCurrentPassword("");
+    setChangeNewPassword("");
+    setChangeConfirmPassword("");
+    setChangePasswordMsg("Password updated successfully.");
+  }
+
   async function redownload(resourceId: string) {
     setMsg("");
     setDownloadingId(resourceId);
@@ -277,8 +291,7 @@ export default function ProfilePage() {
     setMsg("Opened your file in a new tab.");
   }
 
-  // ✅ NOT LOGGED IN
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ny8nf5
+  // NOT LOGGED IN
   if (!user) {
     return (
       <main className="max-w-md mx-auto p-8">
@@ -413,29 +426,78 @@ export default function ProfilePage() {
         >
           Logout
         </button>
+
+        <div className="mt-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 bg-white/70 dark:bg-zinc-900/70">
+          <h2 className="text-lg font-semibold">Change password</h2>
+          <p className="text-xs text-zinc-500 mt-1">Update your password while signed in.</p>
+
+          <input
+            type="password"
+            placeholder="Current password"
+            value={changeCurrentPassword}
+            onChange={(e) => setChangeCurrentPassword(e.target.value)}
+            className="
+              mt-4 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <input
+            type="password"
+            placeholder="New password"
+            value={changeNewPassword}
+            onChange={(e) => setChangeNewPassword(e.target.value)}
+            className="
+              mt-3 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={changeConfirmPassword}
+            onChange={(e) => setChangeConfirmPassword(e.target.value)}
+            className="
+              mt-3 w-full px-4 py-3 rounded-2xl
+              border border-zinc-200
+              bg-white
+              dark:bg-zinc-900 dark:border-zinc-700
+              outline-none
+              focus:ring-2 focus:ring-blue-200
+            "
+          />
+
+          <button
+            onClick={changePassword}
+            disabled={changingPassword}
+            className="
+              mt-4 px-4 py-2 rounded-xl
+              bg-black text-white
+              dark:bg-white dark:text-black
+              font-medium
+              disabled:opacity-50
+            "
+          >
+            {changingPassword ? "Updating..." : "Update password"}
+          </button>
+
+          {changePasswordMsg && (
+            <p className="text-sm mt-3 text-zinc-500">{changePasswordMsg}</p>
+          )}
+        </div>
       </div>
 
 
       {/* Library tabs */}
-<<<<<<< HEAD
-      <div className="space-y-4">
-        <div className="flex items-center gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 w-fit bg-white dark:bg-zinc-900">
-          <button
-            onClick={() => setActiveTab("uploads")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-              activeTab === "uploads"
-                ? "bg-black text-white dark:bg-white dark:text-black"
-                : "text-zinc-600 dark:text-zinc-300"
-            }`}
-          >
-            My Uploads
-          </button>
-
-          <button
-            onClick={() => setActiveTab("downloaded")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-              activeTab === "downloaded"
-=======
       <div className="space-y-4 rounded-3xl p-4 border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/70">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">My Library</h2>
@@ -447,21 +509,10 @@ export default function ProfilePage() {
             onClick={() => setActiveTab("uploads")}
             className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
               activeTab === "uploads"
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
                 ? "bg-black text-white dark:bg-white dark:text-black"
                 : "text-zinc-600 dark:text-zinc-300"
             }`}
           >
-<<<<<<< HEAD
-            Downloaded
-          </button>
-        </div>
-
-        {activeTab === "downloaded" ? (
-          <div className="space-y-3">
-            <h2 className="text-xl font-semibold">Downloaded Resources</h2>
-
-=======
             My Uploads ({uploads.length})
           </button>
 
@@ -479,7 +530,6 @@ export default function ProfilePage() {
 
         {activeTab === "downloaded" ? (
           <div className="space-y-3">
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
             {purchases.map((purchase) => (
               <div
                 key={purchase.id}
@@ -519,9 +569,6 @@ export default function ProfilePage() {
           </div>
         ) : (
           <div className="space-y-3">
-<<<<<<< HEAD
-            <h2 className="text-xl font-semibold">My Uploads</h2>
-
             {uploads.map((u) => {
               const statusStyles = {
                 approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
@@ -541,27 +588,6 @@ export default function ProfilePage() {
                   <div className="flex justify-between">
                     <p className="font-medium">{u.title}</p>
 
-=======
-            {uploads.map((u) => {
-              const statusStyles = {
-                approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
-                pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40",
-                rejected: "bg-red-100 text-red-700 dark:bg-red-900/40",
-              };
-
-              return (
-                <div
-                  key={u.id}
-                  className="
-                    rounded-2xl p-4
-                    border border-zinc-200 dark:border-zinc-800
-                    bg-white dark:bg-zinc-900
-                  "
-                >
-                  <div className="flex justify-between">
-                    <p className="font-medium">{u.title}</p>
-
->>>>>>> origin/codex/open-downloaded-files-in-new-tab-ahx3qf
                     <div
                       className={`
                         px-3 py-1 rounded-full text-xs font-medium
