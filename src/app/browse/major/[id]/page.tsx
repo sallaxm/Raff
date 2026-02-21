@@ -1,6 +1,24 @@
 import { supabaseServer } from "@/lib/supabase/server";
 import MajorCoursesClient from "./MajorCoursesClient";
 
+type ClientCourseRow = {
+  year: number;
+  semester: number;
+  is_elective: boolean;
+  courses: {
+    id: string;
+    code: string;
+    name: string;
+  };
+};
+
+type MajorCourseQueryRow = {
+  year: number;
+  semester: number;
+  is_elective: boolean;
+  courses: ClientCourseRow["courses"] | ClientCourseRow["courses"][] | null;
+};
+
 export default async function MajorPage({
   params,
 }: {
@@ -42,6 +60,20 @@ export default async function MajorPage({
     return <main className="p-6">Error: {error.message}</main>;
   }
 
+  const rows: ClientCourseRow[] = ((data ?? []) as MajorCourseQueryRow[])
+    .map((row) => {
+      const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
+      if (!course) return null;
+
+      return {
+        year: row.year,
+        semester: row.semester,
+        is_elective: row.is_elective,
+        courses: course,
+      };
+    })
+    .filter((row): row is ClientCourseRow => row !== null);
+
   // Pass to client for search/filtering
-  return <MajorCoursesClient majorName={major.name} rows={(data as any[]) ?? []} />;
+  return <MajorCoursesClient majorName={major.name} rows={rows} />;
 }

@@ -15,7 +15,6 @@ export default async function CollegeMajorsPage({
   const { data: college, error: collegeError } = await supabase
     .from("colleges")
     .select("id, name, institution_id, slug")
-    .eq("institution_id", "udst")
     .eq("slug", slug)
     .maybeSingle(); // safer than .single()
 
@@ -31,7 +30,6 @@ export default async function CollegeMajorsPage({
   const { data: majors, error: majorsError } = await supabase
     .from("majors")
     .select("id, name")
-    .eq("institution_id", "udst")
     .eq("college_id", college.id)
     .order("name");
 
