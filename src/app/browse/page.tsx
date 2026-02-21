@@ -12,13 +12,22 @@ export default async function BrowsePage() {
 
   if (error) return <main className="p-6">Error: {error.message}</main>;
 
+  const orderedColleges = [...(colleges ?? [])].sort((a, b) => {
+    if (a.slug === "islamic-studies" && b.slug !== "islamic-studies") return -1;
+    if (b.slug === "islamic-studies" && a.slug !== "islamic-studies") return 1;
+    if (a.institution_id !== b.institution_id) {
+      return a.institution_id.localeCompare(b.institution_id);
+    }
+    return a.name.localeCompare(b.name);
+  });
+
   return (
     <main className="max-w-2xl mx-auto p-6 space-y-4">
       <h1 className="text-3xl font-semibold">Browse</h1>
       <p className="text-zinc-500">Pick a college</p>
 
       <div className="space-y-3">
-        {colleges?.map((c) => (
+        {orderedColleges.map((c) => (
           <Link
             key={c.id}
             href={`/browse/college/${c.slug}`}
@@ -29,7 +38,10 @@ export default async function BrowsePage() {
             "
           >
             <div className="text-lg font-semibold">{c.name}</div>
-            <div className="text-sm text-zinc-500">{c.institution_id.toUpperCase()}</div>
+            <div className="text-sm text-zinc-500">
+              {c.slug === "islamic-studies" ? "Featured • " : ""}
+              {c.institution_id.toUpperCase()}
+            </div>
           </Link>
         ))}
       </div>
