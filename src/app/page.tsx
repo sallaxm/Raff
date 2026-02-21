@@ -65,7 +65,19 @@ export default async function HomePage() {
     .order("created_at", { ascending: false })
     .limit(12);
 
-  const latestRows = (latest ?? []) as LatestResource[];
+  const latestRows: LatestResource[] = ((latest ?? []) as Array<{
+    id: string;
+    title: string;
+    type: string;
+    cost: number;
+    page_count: number | null;
+    created_at: string;
+    courses: { code: string; name: string } | { code: string; name: string }[] | null;
+  }>)
+    .map((row) => ({
+      ...row,
+      courses: Array.isArray(row.courses) ? (row.courses[0] ?? null) : row.courses,
+    }));
 
   return (
     <main className="max-w-5xl mx-auto p-6 space-y-6">
