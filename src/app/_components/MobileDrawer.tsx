@@ -1,20 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import Link from "next/link";
 import ThemeToggle from "@/components/ThemeToggle";
 import SideNav from "@/app/_components/SideNav";
 
 export default function MobileDrawer() {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-
-  // close drawer on route change
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
   // prevent body scroll when open
   useEffect(() => {
     if (!open) return;

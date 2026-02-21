@@ -4,33 +4,31 @@ import { useEffect, useState } from "react";
 
 type Theme = "light" | "dark";
 
+function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "light";
+
+  const saved = localStorage.getItem("raff-theme");
+  if (saved === "light" || saved === "dark") return saved;
+
+  return window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ? "dark" : "light";
+}
+
 function applyTheme(t: Theme) {
   const root = document.documentElement;
   root.classList.toggle("dark", t === "dark");
 }
 
 export default function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("light");
+  const [theme, setTheme] = useState<Theme>(getInitialTheme);
 
   useEffect(() => {
-    const saved = localStorage.getItem("raff-theme") as Theme | null;
-    if (saved === "light" || saved === "dark") {
-      setTheme(saved);
-      applyTheme(saved);
-      return;
-    }
-    // default: system
-    const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
-    const t: Theme = prefersDark ? "dark" : "light";
-    setTheme(t);
-    applyTheme(t);
-  }, []);
+    applyTheme(theme);
+  }, [theme]);
 
   function toggle() {
     const next: Theme = theme === "dark" ? "light" : "dark";
     setTheme(next);
     localStorage.setItem("raff-theme", next);
-    applyTheme(next);
   }
 
   return (

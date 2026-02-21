@@ -6,6 +6,17 @@ import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type SortKey = "newest" | "cheapest" | "expensive";
 
+type ResourceItem = {
+  id: string;
+  title: string;
+  type: string;
+  cost: number;
+  page_count: number | null;
+  created_at: string;
+  course_id: string | null;
+  courses: { id: string; code: string; name: string } | null;
+};
+
 export default function ResourcesPage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
   const searchParams = useSearchParams();
@@ -17,7 +28,7 @@ export default function ResourcesPage() {
   const [sort, setSort] = useState<SortKey>("newest");
   const [q, setQ] = useState<string>(searchParams.get("q") ?? "");
 
-  const [items, setItems] = useState<any[]>([]);
+  const [items, setItems] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(false);
 
   // Load credits
@@ -67,7 +78,7 @@ export default function ResourcesPage() {
     const { data, error } = await query.limit(100);
 
     if (error) setMsg(error.message);
-    setItems(data ?? []);
+    setItems((data ?? []) as ResourceItem[]);
     setLoading(false);
   }
 
