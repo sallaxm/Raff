@@ -132,6 +132,8 @@ export default function UploadPage() {
   // Load colleges
   useEffect(() => {
     async function load() {
+      await fetch("/api/bootstrap/islamic-studies", { method: "POST" }).catch(() => null);
+
       const { data, error } = await supabase
         .from("colleges")
         .select("id,name,institution_id")

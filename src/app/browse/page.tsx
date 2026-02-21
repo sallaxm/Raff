@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { supabaseServer } from "@/lib/supabase/server";
+import { ensureIslamicStudiesSeeded } from "@/lib/islamicStudies";
 
 export default async function BrowsePage() {
+  await ensureIslamicStudiesSeeded();
+
   const supabase = await supabaseServer();
 
   const { data: colleges, error } = await supabase
