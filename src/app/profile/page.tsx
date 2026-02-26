@@ -57,6 +57,7 @@ export default function ProfilePage() {
   const [changePasswordMsg, setChangePasswordMsg] = useState("");
   const [changingPassword, setChangingPassword] = useState(false);
   const [activeTab, setActiveTab] = useState<"uploads" | "downloaded">("uploads");
+  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
   const load = useCallback(async () => {
     const { data } = await supabase.auth.getUser();
@@ -164,7 +165,11 @@ export default function ProfilePage() {
     setSending(false);
 
     if (error) {
-      setMsg(error.message);
+      if (error.status === 500) {
+        setMsg("Signup is temporarily unavailable due to a server issue. Please try again in a moment or use Reset password if your account already exists.");
+      } else {
+        setMsg(error.message);
+      }
       return;
     }
 
@@ -303,11 +308,13 @@ export default function ProfilePage() {
           border border-zinc-200 dark:border-zinc-800
         ">
           <h1 className="text-3xl font-semibold">
-            Welcome to Raff
+            {authMode === "login" ? "Welcome back" : "Create your account"}
           </h1>
 
           <p className="text-sm text-zinc-500 mt-1">
-            Login with your university email and password.
+            {authMode === "login"
+              ? "Login with your email and password."
+              : "Sign up to start uploading and downloading resources."}
           </p>
 
           <input
@@ -340,9 +347,39 @@ export default function ProfilePage() {
             "
           />
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-900">
             <button
-              onClick={login}
+              onClick={() => {
+                setMsg("");
+                setAuthMode("login");
+              }}
+              className={`py-2 rounded-xl text-sm font-medium transition ${
+                authMode === "login"
+                  ? "bg-black text-white dark:bg-white dark:text-black"
+                  : "text-zinc-600 dark:text-zinc-300"
+              }`}
+            >
+              Login
+            </button>
+
+            <button
+              onClick={() => {
+                setMsg("");
+                setAuthMode("signup");
+              }}
+              className={`py-2 rounded-xl text-sm font-medium transition ${
+                authMode === "signup"
+                  ? "bg-black text-white dark:bg-white dark:text-black"
+                  : "text-zinc-600 dark:text-zinc-300"
+              }`}
+            >
+              Sign up
+            </button>
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-2">
+            <button
+              onClick={authMode === "login" ? login : signup}
               disabled={sending}
               className="
                 py-3 rounded-2xl
@@ -353,35 +390,23 @@ export default function ProfilePage() {
                 disabled:opacity-50
               "
             >
-              {sending ? "Working..." : "Login"}
-            </button>
-
-            <button
-              onClick={signup}
-              disabled={sending}
-              className="
-                py-3 rounded-2xl
-                border border-zinc-300 dark:border-zinc-700
-                font-medium
-                hover:bg-zinc-100 dark:hover:bg-zinc-800 transition
-                disabled:opacity-50
-              "
-            >
-              {sending ? "Working..." : "Sign up"}
+              {sending ? "Working..." : authMode === "login" ? "Login" : "Sign up"}
             </button>
           </div>
 
-          <button
-            onClick={resetPassword}
-            disabled={sending}
-            className="
-              mt-3 text-sm underline underline-offset-4
-              text-zinc-600 dark:text-zinc-300
-              disabled:opacity-50
-            "
-          >
-            {sending ? "Working..." : "Reset password"}
-          </button>
+          {authMode === "login" && (
+            <button
+              onClick={resetPassword}
+              disabled={sending}
+              className="
+                mt-3 text-sm underline underline-offset-4
+                text-zinc-600 dark:text-zinc-300
+                disabled:opacity-50
+              "
+            >
+              {sending ? "Working..." : "Reset password"}
+            </button>
+          )}
 
           {msg && (
             <p className="text-sm mt-4 text-zinc-500">
