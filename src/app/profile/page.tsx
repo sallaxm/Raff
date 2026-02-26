@@ -165,7 +165,11 @@ export default function ProfilePage() {
     setSending(false);
 
     if (error) {
-      setMsg(error.message);
+      if (error.status === 500) {
+        setMsg("Signup is temporarily unavailable due to a server issue. Please try again in a moment or use Reset password if your account already exists.");
+      } else {
+        setMsg(error.message);
+      }
       return;
     }
 
