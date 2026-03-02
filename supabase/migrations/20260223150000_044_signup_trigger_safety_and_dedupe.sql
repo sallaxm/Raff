@@ -1,5 +1,6 @@
 -- 044_signup_trigger_safety_and_dedupe.sql
--- Harden signup profile bootstrap while avoiding over-broad trigger changes.
+-- Consolidated cleanup for signup trigger behavior.
+-- Supersedes the earlier split fixes so trigger logic lives in one place.
 
 -- Ensure fallback institutions exist outside of trigger runtime.
 insert into public.institutions (id, name, status)
