@@ -1,5 +1,5 @@
 -- 042_fix_signup_trigger_resilience.sql
--- Prevent "Database error saving new user" by making signup trigger resilient.
+-- Keep signup open to all email domains and make profile provisioning resilient.
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -10,6 +10,7 @@ as $$
 declare
   default_institution_id text;
 begin
+  -- No email-domain restriction here: any authenticated user can sign up.
   select id
   into default_institution_id
   from public.institutions
@@ -30,17 +31,18 @@ begin
     insert into public.institutions (id, name, status)
     values ('open-institution', 'Open Institution', 'active')
     on conflict (id) do update
-    set status = 'active';
+    set name = excluded.name,
+        status = excluded.status;
 
     default_institution_id := 'open-institution';
   end if;
 
-  insert into public.profiles(id, institution_id, credits)
+  insert into public.profiles (id, institution_id, credits)
   values (new.id, default_institution_id, 20)
   on conflict (id) do nothing;
 
   if exists (select 1 from public.profiles where id = new.id) then
-    insert into public.credit_transactions(user_id, amount, kind, note)
+    insert into public.credit_transactions (user_id, amount, kind, note)
     values (new.id, 20, 'STARTER', 'Starter credits on signup');
   end if;
 
@@ -52,7 +54,6 @@ exception
 end;
 $$;
 
--- Ensure trigger is attached (idempotent).
 drop trigger if exists on_auth_user_created on auth.users;
 
 create trigger on_auth_user_created
