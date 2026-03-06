@@ -1,5 +1,35 @@
--- 042_fix_signup_trigger_resilience.sql
--- Keep signup open to all email domains and make profile provisioning resilient.
+-- 043_harden_open_signup_no_domain_restrictions.sql
+-- Ensure signup is domain-agnostic on already-provisioned databases.
+-- This migration is intentionally additive (does not rewrite old history)
+-- so existing environments receive the fix when migrated.
+
+-- Remove legacy public functions that explicitly enforce UDST-only emails.
+do $$
+declare
+  fn record;
+begin
+  for fn in
+    select
+      n.nspname as schema_name,
+      p.proname as function_name,
+      pg_get_function_identity_arguments(p.oid) as args
+    from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and (
+        pg_get_functiondef(p.oid) ilike '%@udst.edu.qa%'
+        or pg_get_functiondef(p.oid) ilike '%Only UDST emails are allowed%'
+      )
+  loop
+    execute format(
+      'drop function if exists %I.%I(%s) cascade',
+      fn.schema_name,
+      fn.function_name,
+      fn.args
+    );
+  end loop;
+end
+$$;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -10,7 +40,7 @@ as $$
 declare
   default_institution_id text;
 begin
-  -- No email-domain restriction here: any authenticated user can sign up.
+  -- Explicitly no email-domain restriction.
   select id
   into default_institution_id
   from public.institutions
@@ -49,6 +79,7 @@ begin
   return new;
 exception
   when others then
+    -- Never block auth signups because of profile/bootstrap issues.
     raise warning 'handle_new_user warning for %: %', new.id, sqlerrm;
     return new;
 end;
