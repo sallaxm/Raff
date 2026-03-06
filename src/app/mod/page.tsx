@@ -47,6 +47,7 @@ export default function ModPage() {
   const [openPreviewId, setOpenPreviewId] = useState<string | null>(null);
   const [previewUrlById, setPreviewUrlById] = useState<Record<string, string>>({});
   const [previewLoadingById, setPreviewLoadingById] = useState<Record<string, boolean>>({});
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
@@ -84,11 +85,42 @@ export default function ModPage() {
   }, []);
 
   async function approve(id: string, reward?: number) {
-  await supabase.rpc("approve_resource_with_reward", {
-    p_resource_id: id,
-    p_reward_override: reward ?? null,
-  });
-}
+    await supabase.rpc("approve_resource_with_reward", {
+      p_resource_id: id,
+      p_reward_override: reward ?? null,
+    });
+  }
+
+  async function deleteResource(id: string) {
+    const ok = confirm("Delete this file and resource record? This cannot be undone.");
+    if (!ok) return;
+
+    setMsg("");
+    setDeletingId(id);
+
+    try {
+      const res = await fetch(`/api/mod/resource/${id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setMsg(json?.error || "Failed to delete resource");
+        return;
+      }
+
+      setMsg("Deleted 🗑️");
+      setEditingId((current) => (current === id ? null : current));
+      setDraft((current) => (current?.id === id ? null : current));
+      setOpenPreviewId((current) => (current === id ? null : current));
+      setPreviewUrlById((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      await load();
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function reject(id: string) {
     setMsg("");
@@ -335,6 +367,14 @@ export default function ModPage() {
                   className="px-4 py-2 rounded-2xl text-sm bg-rose-500 text-white hover:opacity-90"
                 >
                   Reject
+                </button>
+
+                <button
+                  onClick={() => deleteResource(r.id)}
+                  disabled={deletingId === r.id}
+                  className="px-4 py-2 rounded-2xl text-sm border border-rose-300 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                >
+                  {deletingId === r.id ? "Deleting…" : "Delete file"}
                 </button>
               </div>
 
