@@ -255,10 +255,7 @@ export default function UploadPage() {
       }
 
       const cleanTitle = title.trim();
-      if (!cleanTitle) {
-        setMsg("Title is required.");
-        return;
-      }
+      const resolvedTitle = cleanTitle || file.name;
 
       if (!collegeId || !majorId) {
         setMsg("Pick a college and major.");
@@ -294,7 +291,7 @@ export default function UploadPage() {
       const payload: ResourceInsert = {
         institution_id: selectedCollege.institution_id,
         uploader_id: u.user.id,
-        title: cleanTitle,
+        title: resolvedTitle,
         type,
         cost,
         page_count: pageCount,
