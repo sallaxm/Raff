@@ -23,6 +23,7 @@ export default function ResourcesPage() {
 
   const [msg, setMsg] = useState("");
   const [credits, setCredits] = useState<number | null>(null);
+  const [isMod, setIsMod] = useState(false);
 
   const [type, setType] = useState<string>("all");
   const [sort, setSort] = useState<SortKey>("newest");
@@ -30,6 +31,7 @@ export default function ResourcesPage() {
 
   const [items, setItems] = useState<ResourceItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Load credits
   useEffect(() => {
@@ -41,13 +43,37 @@ export default function ResourcesPage() {
       }
       const { data: profile } = await supabase
         .from("profiles")
-        .select("credits")
+        .select("credits,role")
         .eq("id", u.user.id)
         .single();
 
       setCredits(profile?.credits ?? 0);
+      setIsMod(profile?.role === "mod" || profile?.role === "admin");
     })();
   }, [supabase]);
+
+  async function deleteResource(resourceId: string) {
+    const ok = confirm("Delete this resource and file? This cannot be undone.");
+    if (!ok) return;
+
+    setMsg("");
+    setDeletingId(resourceId);
+
+    try {
+      const res = await fetch(`/api/mod/resource/${resourceId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setMsg(json?.error || "Failed to delete resource");
+        return;
+      }
+
+      setMsg("Resource deleted 🗑️");
+      setItems((prev) => prev.filter((item) => item.id !== resourceId));
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   async function load() {
     setLoading(true);
@@ -236,6 +262,20 @@ export default function ResourcesPage() {
               >
                 Download
               </button>
+
+              {isMod && (
+                <button
+                  onClick={() => deleteResource(r.id)}
+                  disabled={deletingId === r.id}
+                  className="
+                    shrink-0 px-4 py-2 rounded-2xl border border-rose-300 text-rose-600 text-sm
+                    hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed
+                    dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/30
+                  "
+                >
+                  {deletingId === r.id ? "Deleting…" : "Delete"}
+                </button>
+              )}
             </div>
           </div>
         ))}
