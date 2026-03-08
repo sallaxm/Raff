@@ -84,11 +84,35 @@ export default function ModPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function saveResourceMetadata(input: Row) {
+    const title = (input.title ?? "").trim();
+    if (!title) return "Title cannot be empty.";
+
+    const pages = Number(input.page_count ?? 1);
+    const cost = Number(input.cost ?? 1);
+
+    if (!Number.isFinite(pages) || pages < 1) return "Pages must be >= 1.";
+    if (!Number.isFinite(cost) || cost < 0) return "Cost must be >= 0.";
+
+    const { error } = await supabase.rpc("update_resource_metadata", {
+      p_id: input.id,
+      p_title: title,
+      p_type: input.type,
+      p_page_count: pages,
+      p_cost: cost,
+      p_course_id: input.course_id,
+    });
+
+    return error?.message ?? null;
+  }
+
   async function approve(id: string, reward?: number) {
-    await supabase.rpc("approve_resource_with_reward", {
+    const { error } = await supabase.rpc("approve_resource_with_reward", {
       p_resource_id: id,
       p_reward_override: reward ?? null,
     });
+
+    return error?.message ?? null;
   }
 
   async function deleteResource(id: string) {
@@ -143,31 +167,31 @@ export default function ModPage() {
   async function saveEdit() {
     if (!draft) return;
 
-    const title = (draft.title ?? "").trim();
-    if (!title) return setMsg("Title cannot be empty.");
-
-    const pages = Number(draft.page_count ?? 1);
-    const cost = Number(draft.cost ?? 1);
-
-    if (!Number.isFinite(pages) || pages < 1) return setMsg("Pages must be >= 1.");
-    if (!Number.isFinite(cost) || cost < 0) return setMsg("Cost must be >= 0.");
-
     setMsg("");
-    const { error } = await supabase.rpc("update_resource_metadata", {
-      p_id: draft.id,
-      p_title: title,
-      p_type: draft.type,
-      p_page_count: pages,
-      p_cost: cost,
-      p_course_id: draft.course_id,
-    });
+    const errorMessage = await saveResourceMetadata(draft);
+    if (errorMessage) return setMsg(errorMessage);
 
-    if (error) return setMsg(error.message);
-
-    setMsg("Updated ✏️");
+    setMsg("Saved metadata ✏️");
     setEditingId(null);
     setDraft(null);
     load();
+  }
+
+  async function approveWithDraft(id: string) {
+    setMsg("");
+
+    if (editingId === id && draft?.id === id) {
+      const errorMessage = await saveResourceMetadata(draft);
+      if (errorMessage) return setMsg(errorMessage);
+    }
+
+    const approveError = await approve(id);
+    if (approveError) return setMsg(approveError);
+
+    setMsg("Approved ✅");
+    setEditingId((current) => (current === id ? null : current));
+    setDraft((current) => (current?.id === id ? null : current));
+    await load();
   }
 
   async function togglePreview(id: string) {
@@ -356,7 +380,7 @@ export default function ModPage() {
                 )}
 
                 <button
-                  onClick={() => approve(r.id)}
+                  onClick={() => approveWithDraft(r.id)}
                   className="px-4 py-2 rounded-2xl text-sm bg-emerald-600 text-white hover:opacity-90"
                 >
                   Approve
