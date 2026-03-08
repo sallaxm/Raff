@@ -33,6 +33,11 @@ type MajorCourseJoinRow = {
 
 type UploadMode = "course" | "major";
 
+type LastUploadEstimate = {
+  credits: number;
+  pageCount: number;
+};
+
 type ResourceInsert = {
   institution_id: string;
   uploader_id: string;
@@ -114,6 +119,7 @@ export default function UploadPage() {
   const estimatedPageCount = file ? detectedPages ?? 1 : null;
   const estimatedCredits =
     estimatedPageCount == null ? null : Math.max(1, Math.ceil(estimatedPageCount / 5));
+  const [lastUploadEstimate, setLastUploadEstimate] = useState<LastUploadEstimate | null>(null);
 
   const selectedCollege = useMemo(
     () => colleges.find((college) => college.id === collegeId) ?? null,
@@ -304,6 +310,7 @@ export default function UploadPage() {
         return;
       }
 
+      setLastUploadEstimate({ credits: cost, pageCount });
       setMsg("Uploaded ✅ Pending approval.");
       setTitle("");
       setFile(null);
@@ -449,7 +456,16 @@ export default function UploadPage() {
           "
         >
           {estimatedCredits == null ? (
-            <span>Estimated reward: <span className="opacity-70">Upload a file to see estimate</span></span>
+            lastUploadEstimate ? (
+              <span>
+                Last uploaded reward: {lastUploadEstimate.credits} credits{" "}
+                <span className="opacity-70">
+                  • {lastUploadEstimate.pageCount} page{lastUploadEstimate.pageCount === 1 ? "" : "s"}
+                </span>
+              </span>
+            ) : (
+              <span>Estimated reward: <span className="opacity-70">Upload a file to see estimate</span></span>
+            )
           ) : (
             <span>
               Estimated reward: {estimatedCredits} credits{" "}
