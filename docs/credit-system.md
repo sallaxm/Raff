@@ -8,15 +8,15 @@ This project uses a ledger-backed credit system in Supabase.
 - A corresponding `credit_transactions` entry is inserted with kind `STARTER`.
 
 ### Download cost
-- Cost formula: `CEIL(page_count / 5)`.
-- Cost is clamped to the range `1..20` via `public.calculate_download_cost(pages integer)`.
-- `spend_credits_and_log_download` uses this computed value and logs a `DOWNLOAD` transaction.
+- Default cost formula: `min(20, max(1, ceil(page_count / 5)))` via `public.calculate_download_cost(pages integer)`.
+- Moderators can override that per resource with `resources.cost_override`; if present, that value is used instead of the formula.
+- `spend_credits_and_log_download` charges the stored `resources.cost` value and logs a `DOWNLOAD` transaction.
 
 ### Upload reward
 - Base reward formula: `FLOOR(download_cost * 0.60)` via `public.calculate_upload_reward(cost integer)`.
 - Moderators can set per-resource:
   - `reward_override` (exact reward), or
-  - `quality_multiplier` (multiplies base reward).
+  - `quality_multiplier` (multiplies base reward; editable in moderator metadata).
 - Approval flow (`approve_resource`) applies either override or multiplier-based reward.
 
 ### First approved upload bonus
@@ -32,6 +32,7 @@ This project uses a ledger-backed credit system in Supabase.
 - `resources` now includes:
   - `reward_override integer null`
   - `quality_multiplier numeric(6,2) default 1.0`
+  - `cost_override integer null`
 - `resource_boosts` tracks boosts.
 - `bounties` tracks bounty lifecycle and payouts.
 

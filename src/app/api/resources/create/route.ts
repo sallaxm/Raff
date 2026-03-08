@@ -6,6 +6,11 @@ import * as mammoth from "mammoth";
 
 export const runtime = "nodejs";
 
+function calculateDownloadCost(pageCount: number) {
+  const computed = Math.ceil(pageCount / 5);
+  return Math.min(20, Math.max(1, computed));
+}
+
 type Body = {
   storage_path: string; // "<uid>/<uuid>-file.ext"
   title: string;
@@ -132,7 +137,7 @@ export async function POST(req: NextRequest) {
     page_count = 1; // fallback; mod can adjust later
   }
 
-  const cost = Math.max(1, Math.ceil(page_count / 5));
+  const cost = calculateDownloadCost(page_count);
 
   const { data: inserted, error: insErr } = await admin
     .from("resources")

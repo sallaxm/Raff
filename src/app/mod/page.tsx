@@ -9,6 +9,7 @@ type Row = {
   type: string;
   cost: number;
   page_count: number | null;
+  quality_multiplier: number | null;
   created_at: string;
   uploader_id: string | null;
   course_id: string | null;
@@ -64,7 +65,7 @@ export default function ModPage() {
       .from("resources")
       .select(
         `
-        id,title,type,cost,page_count,created_at,uploader_id,course_id,
+        id,title,type,cost,page_count,quality_multiplier,created_at,uploader_id,course_id,
         courses ( code, name )
       `
       )
@@ -94,12 +95,19 @@ export default function ModPage() {
     if (!Number.isFinite(pages) || pages < 1) return "Pages must be >= 1.";
     if (!Number.isFinite(cost) || cost < 0) return "Cost must be >= 0.";
 
+    const qualityMultiplier = Number(input.quality_multiplier ?? 1);
+
+    if (!Number.isFinite(qualityMultiplier) || qualityMultiplier < 0 || qualityMultiplier > 5) {
+      return "Quality modifier must be between 0 and 5.";
+    }
+
     const { error } = await supabase.rpc("update_resource_metadata", {
       p_id: input.id,
       p_title: title,
       p_type: input.type,
       p_page_count: pages,
       p_cost: cost,
+      p_quality_multiplier: qualityMultiplier,
       p_course_id: input.course_id,
     });
 
@@ -293,7 +301,7 @@ export default function ModPage() {
                         />
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-4 gap-2">
                         <div>
                           <FieldLabel>Pages</FieldLabel>
                           <input
@@ -312,6 +320,21 @@ export default function ModPage() {
                             min={0}
                             value={Number(draft?.cost ?? 0)}
                             onChange={(e) => setDraft({ ...draft!, cost: Number(e.target.value) })}
+                            className="mt-1 w-full rounded-2xl px-3 py-2 text-sm border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
+                          />
+                        </div>
+
+                        <div>
+                          <FieldLabel>Quality modifier</FieldLabel>
+                          <input
+                            type="number"
+                            min={0}
+                            max={5}
+                            step={0.1}
+                            value={Number(draft?.quality_multiplier ?? 1)}
+                            onChange={(e) =>
+                              setDraft({ ...draft!, quality_multiplier: Number(e.target.value) })
+                            }
                             className="mt-1 w-full rounded-2xl px-3 py-2 text-sm border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
                           />
                         </div>
