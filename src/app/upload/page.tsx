@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { PDFDocument } from "pdf-lib";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 
 type College = { id: string; name: string; institution_id: string };
@@ -21,10 +22,6 @@ const categories = [
 const ACCEPT =
   ".pdf,.docx,.pptx,.xlsx,.txt,.md,.zip,.rar,.7z,.png,.jpg,.jpeg,.webp";
 
-type PdfJsModule = {
-  GlobalWorkerOptions: { workerSrc: string };
-  getDocument: (source: { data: ArrayBuffer }) => { promise: Promise<{ numPages?: number }> };
-};
 
 type MammothModule = {
   extractRawText: (input: { arrayBuffer: ArrayBuffer }) => Promise<{ value?: string }>;
@@ -35,6 +32,11 @@ type MajorCourseJoinRow = {
 };
 
 type UploadMode = "course" | "major";
+
+type LastUploadEstimate = {
+  credits: number;
+  pageCount: number;
+};
 
 type ResourceInsert = {
   institution_id: string;
@@ -51,17 +53,10 @@ type ResourceInsert = {
 
 async function countPdfPages(file: File): Promise<number | null> {
   try {
-    // pdfjs-dist works client-side
-    const pdfjs = (await import("pdfjs-dist/legacy/build/pdf")) as unknown as PdfJsModule;
-    // Worker setup (CDN). If this fails in some environments, we just fallback to null.
-    try {
-      pdfjs.GlobalWorkerOptions.workerSrc =
-        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
-    } catch {}
-
     const buf = await file.arrayBuffer();
-    const doc = await pdfjs.getDocument({ data: buf }).promise;
-    return typeof doc.numPages === "number" ? doc.numPages : null;
+    const pdf = await PDFDocument.load(buf, { ignoreEncryption: true });
+    const pageCount = pdf.getPageCount();
+    return pageCount > 0 ? pageCount : null;
   } catch {
     return null;
   }
@@ -121,8 +116,12 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
 
   const [detectedPages, setDetectedPages] = useState<number | null>(null);
+  const estimatedPageCount = file ? detectedPages ?? 1 : null;
   const estimatedCredits =
-    detectedPages == null ? null : Math.max(1, Math.round(detectedPages / 2));
+    estimatedPageCount == null ? null : Math.max(1, Math.ceil(estimatedPageCount / 5));
+  const [lastUploadEstimate, setLastUploadEstimate] = useState<LastUploadEstimate | null>(null);
+  const rewardPageCount = estimatedPageCount ?? lastUploadEstimate?.pageCount ?? 1;
+  const rewardCredits = estimatedCredits ?? lastUploadEstimate?.credits ?? 1;
 
   const selectedCollege = useMemo(
     () => colleges.find((college) => college.id === collegeId) ?? null,
@@ -255,10 +254,7 @@ export default function UploadPage() {
       }
 
       const cleanTitle = title.trim();
-      if (!cleanTitle) {
-        setMsg("Title is required.");
-        return;
-      }
+      const resolvedTitle = cleanTitle || file.name;
 
       if (!collegeId || !majorId) {
         setMsg("Pick a college and major.");
@@ -294,7 +290,7 @@ export default function UploadPage() {
       const payload: ResourceInsert = {
         institution_id: selectedCollege.institution_id,
         uploader_id: u.user.id,
-        title: cleanTitle,
+        title: resolvedTitle,
         type,
         cost,
         page_count: pageCount,
@@ -316,6 +312,7 @@ export default function UploadPage() {
         return;
       }
 
+      setLastUploadEstimate({ credits: cost, pageCount });
       setMsg("Uploaded ✅ Pending approval.");
       setTitle("");
       setFile(null);
@@ -460,14 +457,13 @@ export default function UploadPage() {
             break-words
           "
         >
-          {detectedPages == null ? (
-            <span>Estimated reward: <span className="opacity-70">TBD (auto-detect for PDF/DOCX)</span></span>
-          ) : (
-            <span>
-              Estimated reward: {estimatedCredits} credits{" "}
-              <span className="opacity-70">• {detectedPages} pages detected</span>
+          <span>
+            Estimated reward: {rewardCredits} credits{" "}
+            <span className="opacity-70">
+              • {rewardPageCount} page{rewardPageCount === 1 ? "" : "s"}{" "}
+              {file ? (detectedPages == null ? "(fallback)" : "detected") : lastUploadEstimate ? "(last upload)" : "(default)"}
             </span>
-          )}
+          </span>
         </div>
 
         <input
