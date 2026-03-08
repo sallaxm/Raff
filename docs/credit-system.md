@@ -16,7 +16,7 @@ This project uses a ledger-backed credit system in Supabase.
 - Base reward formula: `FLOOR(download_cost * 0.60)` via `public.calculate_upload_reward(cost integer)`.
 - Moderators can set per-resource:
   - `reward_override` (exact reward), or
-  - `quality_multiplier` (multiplies base reward).
+  - `quality_multiplier` (multiplies base reward; editable in moderator metadata).
 - Approval flow (`approve_resource`) applies either override or multiplier-based reward.
 
 ### First approved upload bonus
