@@ -121,8 +121,9 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
 
   const [detectedPages, setDetectedPages] = useState<number | null>(null);
+  const estimatedPageCount = file ? detectedPages ?? 1 : null;
   const estimatedCredits =
-    detectedPages == null ? null : Math.max(1, Math.ceil(detectedPages / 5));
+    estimatedPageCount == null ? null : Math.max(1, Math.ceil(estimatedPageCount / 5));
 
   const selectedCollege = useMemo(
     () => colleges.find((college) => college.id === collegeId) ?? null,
@@ -457,12 +458,15 @@ export default function UploadPage() {
             break-words
           "
         >
-          {detectedPages == null ? (
-            <span>Estimated reward: <span className="opacity-70">TBD (auto-detect for PDF/DOCX)</span></span>
+          {estimatedCredits == null ? (
+            <span>Estimated reward: <span className="opacity-70">Upload a file to see estimate</span></span>
           ) : (
             <span>
               Estimated reward: {estimatedCredits} credits{" "}
-              <span className="opacity-70">• {detectedPages} pages detected</span>
+              <span className="opacity-70">
+                • {estimatedPageCount} page{estimatedPageCount === 1 ? "" : "s"}{" "}
+                {detectedPages == null ? "(fallback)" : "detected"}
+              </span>
             </span>
           )}
         </div>
