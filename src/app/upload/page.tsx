@@ -122,7 +122,7 @@ export default function UploadPage() {
 
   const [detectedPages, setDetectedPages] = useState<number | null>(null);
   const estimatedCredits =
-    detectedPages == null ? null : Math.max(1, Math.round(detectedPages / 2));
+    detectedPages == null ? null : Math.max(1, Math.ceil(detectedPages / 5));
 
   const selectedCollege = useMemo(
     () => colleges.find((college) => college.id === collegeId) ?? null,
