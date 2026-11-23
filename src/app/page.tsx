@@ -138,7 +138,7 @@ export default async function HomePage() {
       {!user && (
         <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
           {[
-            { href: "/browse", icon: GraduationCap, title: "Pick your program", text: "All 37 UDST bachelor study plans, year by year." },
+            { href: "/browse", icon: GraduationCap, title: "Pick your program", text: "Every UDST bachelor, diploma and master's study plan, year by year." },
             { href: "/search", icon: FileText, title: "Open a course", text: "Every past paper, note and lab for that course in one list." },
             { href: "/profile", icon: Sparkles, title: "Share & earn", text: "Sign up free, upload your own material and earn credits." },
           ].map(({ href, icon: Icon, title, text }) => (

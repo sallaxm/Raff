@@ -3,6 +3,14 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
 
+const LEVELS = [
+  { key: "bachelor", label: "Bachelor's degrees" },
+  { key: "advanced-diploma", label: "Advanced diplomas" },
+  { key: "diploma", label: "Diplomas" },
+  { key: "master", label: "Master's degrees" },
+  { key: "other", label: "Other programs" },
+];
+
 export default async function CollegeMajorsPage({
   params,
 }: {
@@ -24,7 +32,7 @@ export default async function CollegeMajorsPage({
 
   const { data: majorRows, error: majorsError } = await supabase
     .from("majors")
-    .select("id, name, short_name, major_courses ( count )")
+    .select("id, name, short_name, level, major_courses ( count )")
     .eq("college_id", college.id)
     .order("name");
 
@@ -32,8 +40,11 @@ export default async function CollegeMajorsPage({
     id: m.id as string,
     name: m.name as string,
     shortName: (m.short_name as string | null) ?? null,
+    level: (m.level as string | null) ?? "other",
     courses: ((m.major_courses as { count: number }[] | null)?.[0]?.count ?? 0) as number,
   }));
+
+  const groups = LEVELS.map((l) => ({ ...l, items: majors.filter((m) => m.level === l.key) })).filter((g) => g.items.length);
 
   return (
     <main className="page-narrow">
@@ -52,17 +63,22 @@ export default async function CollegeMajorsPage({
       {!majors?.length ? (
         <p className="card text-sm muted">No majors found.</p>
       ) : (
-        <div className="space-y-2">
-          {majors.map((m) => (
-            <Link key={m.id} href={`/browse/major/${m.id}`} className="card card-hover flex items-center justify-between gap-4 py-4">
-              <span className="min-w-0">
-                <span className="block font-semibold">{m.name}</span>
-                <span className="block text-xs muted">
-                  {[m.shortName, m.courses ? `${m.courses} courses` : "Study plan coming soon"].filter(Boolean).join(" · ")}
-                </span>
-              </span>
-              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
-            </Link>
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <section key={g.key} className="space-y-2">
+              {groups.length > 1 && <h2 className="h2">{g.label}</h2>}
+              {g.items.map((m) => (
+                <Link key={m.id} href={`/browse/major/${m.id}`} className="card card-hover flex items-center justify-between gap-4 py-4">
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{m.name}</span>
+                    <span className="block text-xs muted">
+                      {[m.shortName, m.courses ? `${m.courses} courses` : "Study plan coming soon"].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+                </Link>
+              ))}
+            </section>
           ))}
         </div>
       )}
