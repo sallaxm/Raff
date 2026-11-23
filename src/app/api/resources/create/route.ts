@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PDFDocument } from "pdf-lib";
 import * as mammoth from "mammoth";
+import { downloadCost } from "@/lib/credits";
 
 export const runtime = "nodejs";
 
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
     page_count = 1; // fallback; mod can adjust later
   }
 
-  const cost = Math.max(1, Math.ceil(page_count / 5));
+  const cost = downloadCost(page_count); // DB trigger recomputes (and applies mod overrides)
 
   const { data: inserted, error: insErr } = await admin
     .from("resources")

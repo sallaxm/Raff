@@ -1,4 +1,4 @@
--- 044_credit_purchases.sql
+-- 047_credit_purchases.sql
 -- Paid credit top-ups (QAR) via an external payment gateway (Tap Payments).
 --
 -- Flow:

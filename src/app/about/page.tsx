@@ -1,38 +1,110 @@
+import Link from "next/link";
 import type { Metadata } from "next";
-import { Coins, ShieldCheck, Upload } from "lucide-react";
 
-export const metadata: Metadata = { title: "About" };
+export const metadata: Metadata = {
+  title: "About",
+  description: "How Raff works: share study material, earn credits, download what you need.",
+};
 
-const STEPS = [
-  { icon: Upload, title: "Upload", text: "Share notes, labs, assignments and past papers." },
-  { icon: ShieldCheck, title: "Get approved", text: "Moderators review every upload for quality and integrity." },
-  { icon: Coins, title: "Earn & spend", text: "Approved uploads earn credits. Spend them to download, or top up in QAR." },
+
+const steps = [
+  {
+    title: "Upload",
+    body: "Share your own notes, graded assignments, lab reports or study guides, filed under the right course.",
+  },
+  {
+    title: "Get reviewed",
+    body: "A moderator checks every upload against the guidelines before it goes public.",
+  },
+  {
+    title: "Earn credits",
+    body: "Once approved, you earn credits based on how substantial the resource is.",
+  },
+  {
+    title: "Download",
+    body: "Spend credits to download what other students have shared.",
+  },
 ];
 
 export default function AboutPage() {
   return (
     <main className="page-narrow">
-      <section className="card-hero">
+      <div className="card">
         <h1 className="h1">About Raff</h1>
         <p className="mt-3 prose-body">
-          Raff is a student resource exchange for universities in Qatar: past papers, notes,
-          labs and assignments, organised by college, major and course.
+          Raff is a student resource exchange, starting with UDST. Past papers, notes, labs and
+          assignments are organised by college, major and course, so you can find what you need for
+          the module you’re actually taking.
         </p>
-      </section>
+        <p className="mt-3 prose-body">
+          It runs on a simple idea: students who share good material should get something back.
+          Uploading earns credits, and credits are what you spend to download.
+        </p>
+      </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {STEPS.map(({ icon: Icon, title, text }, i) => (
-          <div key={title} className="card">
-            <div className="flex items-center gap-2">
-              <span className="grid h-8 w-8 place-items-center rounded-xl bg-zinc-100 dark:bg-zinc-800">
-                <Icon size={16} />
-              </span>
-              <span className="text-xs font-semibold muted">STEP {i + 1}</span>
-            </div>
-            <h2 className="mt-3 font-semibold">{title}</h2>
-            <p className="mt-1 text-sm muted">{text}</p>
-          </div>
-        ))}
+      <div className="card">
+        <h2 className="h2">How it works</h2>
+        <ol className="mt-4 grid gap-3 sm:grid-cols-2">
+          {steps.map((s, i) => (
+            <li
+              key={s.title}
+              className="rounded-2xl border border-zinc-200 bg-white/60 p-4 dark:border-zinc-800 dark:bg-zinc-950/40"
+            >
+              <div className="text-xs font-semibold text-zinc-400">STEP {i + 1}</div>
+              <div className="mt-1 font-semibold">{s.title}</div>
+              <p className="mt-1 text-sm muted">{s.body}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <div className="card">
+        <h2 className="h2">Credits</h2>
+        <ul className="mt-3 space-y-2 prose-body">
+          <li>• New accounts start with <strong>20 credits</strong>.</li>
+          <li>
+            • A download costs roughly <strong>1 credit per 5 pages</strong> (minimum 1, maximum
+            20). You only pay once per resource.
+          </li>
+          <li>
+            • An approved upload earns about <strong>60% of its download cost</strong>. Moderators
+            can raise this for especially high-quality material.
+          </li>
+          <li>• Your first approved upload earns a <strong>+3 bonus</strong>.</li>
+          <li>
+            • Short on credits? You can{" "}
+            <Link href="/credits" className="underline underline-offset-4">
+              top up in QAR
+            </Link>
+            .
+          </li>
+        </ul>
+        <p className="mt-3 text-sm prose-body">
+          You can see every credit you’ve earned or spent on the{" "}
+          <Link href="/credits" className="underline underline-offset-4">
+            Credits
+          </Link>{" "}
+          page.
+        </p>
+      </div>
+
+      <div className="card">
+        <h2 className="h2">Fair use</h2>
+        <p className="mt-3 prose-body">
+          Raff is for studying, not cheating. Leaked exams, paid solutions, copyrighted textbooks
+          and instructor-only material aren’t allowed. Read the{" "}
+          <Link href="/guidelines" className="underline underline-offset-4">
+            upload guidelines
+          </Link>{" "}
+          before sharing anything. Uploads are limited to 10 per day and 50&nbsp;MB per file.
+        </p>
+        <p className="mt-3 prose-body">
+          Questions or ideas?{" "}
+          <Link href="/feedback" className="underline underline-offset-4">
+            Send us feedback
+          </Link>
+          .
+        </p>
       </div>
     </main>
   );
