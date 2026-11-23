@@ -16,6 +16,7 @@ begin
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public'
+      and p.prokind = 'f'  -- pg_get_functiondef() errors on aggregates
       and (
         pg_get_functiondef(p.oid) ilike '%@udst.edu.qa%'
         or pg_get_functiondef(p.oid) ilike '%Only UDST emails are allowed%'
