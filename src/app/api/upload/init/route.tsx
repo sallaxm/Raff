@@ -5,6 +5,11 @@ import { createClient } from "@supabase/supabase-js";
 const TITLE_MAX_LENGTH = 180;
 const TYPE_MAX_LENGTH = 60;
 const EXT_PATTERN = /^[a-z0-9]{1,10}$/;
+// Keep in sync with ACCEPT in src/app/upload/page.tsx
+const ALLOWED_EXTS = new Set([
+  "pdf", "docx", "pptx", "xlsx", "txt", "md",
+  "zip", "rar", "7z", "png", "jpg", "jpeg", "webp",
+]);
 
 function isValidCost(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= 100;
@@ -36,8 +41,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Title or type is too long" }, { status: 400 });
   }
 
-  if (!EXT_PATTERN.test(cleanExt)) {
-    return NextResponse.json({ error: "Invalid file extension" }, { status: 400 });
+  if (!EXT_PATTERN.test(cleanExt) || !ALLOWED_EXTS.has(cleanExt)) {
+    return NextResponse.json({ error: "This file type isn't supported" }, { status: 400 });
   }
 
   // Read the logged-in user from cookies (Next 16 safe)
