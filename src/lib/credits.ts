@@ -1,23 +1,26 @@
 /**
- * Client-side mirrors of the credit formulas in Postgres
- * (see supabase/migrations/*_039_credit_system.sql). The database is the
- * source of truth — these are only for showing estimates in the UI.
+ * Client-side mirrors of the credit rules in Postgres
+ * (see supabase/migrations/*_052_credit_economy_v2.sql). The database is the
+ * source of truth — these are only for showing numbers in the UI.
  */
 
-const PAGES_PER_CREDIT = 5;
-const MAX_DOWNLOAD_COST = 20;
-const UPLOAD_REWARD_SHARE = 0.6;
-export const FIRST_UPLOAD_BONUS = 3;
+/** Credits every new account starts with. */
+export const STARTER_CREDITS = 10;
+/** Default price of a file (moderators can override per file). */
+export const DEFAULT_DOWNLOAD_COST = 2;
+/** Paid to the uploader when a moderator approves their file. */
+export const APPROVAL_REWARD = 2;
+/** One-time bonus on a student's first approved upload. */
+export const FIRST_UPLOAD_BONUS = 10;
 
-/** Mirrors public.calculate_download_cost(pages) */
-export function downloadCost(pages: number | null | undefined) {
-  const p = Math.max(pages ?? 0, 0);
-  return Math.min(Math.max(Math.ceil(p / PAGES_PER_CREDIT), 1), MAX_DOWNLOAD_COST);
+/** Mirrors public.calculate_download_cost(): flat price per file, whatever its length. */
+export function downloadCost() {
+  return DEFAULT_DOWNLOAD_COST;
 }
 
-/** Mirrors public.calculate_upload_reward(cost) — before mod multipliers / bonus */
-export function uploadReward(cost: number) {
-  return Math.floor(Math.max(cost, 0) * UPLOAD_REWARD_SHARE);
+/** Mirrors public.calculate_uploader_share(cost): earned per download. */
+export function uploaderShare(cost: number = DEFAULT_DOWNLOAD_COST) {
+  return cost <= 0 ? 0 : Math.max(1, Math.floor(cost * 0.5));
 }
 
 export function plural(n: number, word: string) {

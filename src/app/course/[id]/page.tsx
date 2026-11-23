@@ -151,7 +151,7 @@ export default async function CoursePage({ params, searchParams }: Params) {
             ))}
           </ul>
           <p className="text-xs muted">
-            Files cost credits the first time you get them; re-opening is free. Earn credits by{" "}
+            You pay once per file and re-opening is free. Half of what you pay goes to the student who shared it. Earn credits by{" "}
             <Link href={`/upload?course=${course.id}`} className="underline underline-offset-4">
               uploading
             </Link>{" "}

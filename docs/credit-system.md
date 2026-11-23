@@ -1,43 +1,55 @@
 # Credit System
 
-## Overview
-This project uses a ledger-backed credit system in Supabase.
+Ledger-backed credits in Supabase. Every balance change happens inside a
+`security definer` function and is logged in `credit_transactions`.
+Rules live in `supabase/migrations/*_052_credit_economy_v2.sql`; the UI mirrors
+them in `src/lib/credits.ts`.
 
-### Starter credits
-- Every new user gets a `profiles` row with `20` credits.
-- A corresponding `credit_transactions` entry is inserted with kind `STARTER`.
+## Rules
 
-### Download cost
-- Default cost formula: `min(20, max(1, ceil(page_count / 5)))` via `public.calculate_download_cost(pages integer)`.
-- Moderators can override that per resource with `resources.cost_override`; if present, that value is used instead of the formula.
-- `spend_credits_and_log_download` charges the stored `resources.cost` value and logs a `DOWNLOAD` transaction.
+| Event | Credits | Ledger kind |
+| --- | --- | --- |
+| Sign up | +10 | `STARTER` |
+| Download a file (once per file; re-opening is free) | −2 (or the moderator's price) | `DOWNLOAD` |
+| Someone downloads your file | +half the price, min 1 (normally +1) | `UPLOAD_EARNING` |
+| Moderator approves your upload | +2 (× quality multiplier, or an exact override) | `UPLOAD_REWARD` |
+| First approved upload | +10 one-time bonus (included in `UPLOAD_REWARD`) | `UPLOAD_REWARD` |
+| Buy a credit pack (QAR, via Tap) | + pack size | `PURCHASE` |
 
-### Upload reward
-- Base reward formula: `FLOOR(download_cost * 0.60)` via `public.calculate_upload_reward(cost integer)`.
-- Moderators can set per-resource:
-  - `reward_override` (exact reward), or
-  - `quality_multiplier` (multiplies base reward; editable in moderator metadata).
-- Approval flow (`approve_resource`) applies either override or multiplier-based reward.
+At the default price each download moves 1 credit to the uploader and removes 1,
+so credits circulate without inflating. Purchases and starter credits are the
+only sources of new credits besides approvals.
 
-### First approved upload bonus
-- On a user’s first approved resource, the system adds `+3` credits on top of reward.
+## Why these numbers
 
-### Credit sinks
-- **Boosts** (`create_boost`): users spend credits to boost their own resources.
-- **Bounties** (`create_bounty` + `award_bounty`): users lock credits as bounty rewards and later award them.
+The previous version priced files by page count (1 credit per 5 pages) and paid
+uploaders 60% of that once, at approval. Short files — the most useful past
+papers — earned their uploaders 0 credits, popular files earned no more than
+unused ones, and 20 free credits per new account made throwaway accounts the
+cheapest way to download. See migration 052 for details.
 
-## Data model
-- `profiles.credits` default is `20`.
-- `credit_transactions` records all balances changes.
-- `resources` now includes:
-  - `reward_override integer null`
-  - `quality_multiplier numeric(6,2) default 1.0`
-  - `cost_override integer null`
-- `resource_boosts` tracks boosts.
-- `bounties` tracks bounty lifecycle and payouts.
+## Functions
 
-## Security and integrity
-- Security-definer functions are used for balance mutations.
-- Exceptions return explicit business-error messages.
-- Constraints enforce valid ranges and transaction kinds.
-- RLS protects new tables and extends moderator visibility for transaction auditing.
+- `calculate_download_cost(pages)` — flat 2 (argument kept for compatibility).
+- `calculate_uploader_share(cost)` — `max(1, floor(cost / 2))`, 0 for free files.
+- `calculate_upload_reward(cost)` — 2.
+- `approve_resource(id)` / `approve_resource_with_reward(id, override)` — moderator
+  approval; applies `reward_override` or `quality_multiplier`, plus first-upload bonus.
+- `spend_credits_and_log_download(id)` — charges the stored `resources.cost`,
+  records the download, pays the uploader their share.
+- `fulfill_payment(payment_id)` — idempotent credit purchase (service role only).
+
+## Moderator controls (per resource)
+
+- `cost_override` — custom price (set by entering a cost in the moderator panel).
+- `reward_override` — exact approval reward.
+- `quality_multiplier` — multiplies the approval reward (0–5).
+
+## Views
+
+- `course_resource_counts` — approved files per course.
+- `my_upload_stats` — downloads and credits earned per upload, for the signed-in user.
+
+## Also available (no UI yet)
+
+- Boosts (`create_boost`) and bounties (`create_bounty`, `award_bounty`).
