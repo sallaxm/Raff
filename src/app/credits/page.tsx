@@ -19,6 +19,7 @@ const KIND_LABELS: Record<string, string> = {
   STARTER: "Welcome credits",
   UPLOAD_REWARD: "Upload approved",
   UPLOAD_BONUS: "Upload bonus",
+  UPLOAD_EARNING: "Someone downloaded your upload",
   DOWNLOAD: "Downloaded a resource",
   PURCHASE: "Bought credits",
   REFUND: "Refund",
@@ -74,7 +75,7 @@ export default async function CreditsPage({
         <p className="text-sm muted">Available balance</p>
         <p className="mt-1 text-5xl font-semibold tracking-tight">{profile?.credits ?? 0}</p>
         <p className="mt-2 text-sm muted">
-          Earn credits by uploading useful material, or top up below.
+          Upload useful material to earn: +2 when approved, then +1 every time someone downloads it. Or top up below.
         </p>
       </section>
 

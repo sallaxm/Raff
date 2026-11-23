@@ -99,7 +99,7 @@ function AuthCard() {
           <p className="mt-1 text-sm muted">
             {mode === "login"
               ? "Log in with your email and password."
-              : "Sign up to start uploading and downloading resources. You get 20 free credits."}
+              : "Sign up to start uploading and downloading resources. You get 10 free credits."}
           </p>
         </div>
 
@@ -229,6 +229,7 @@ export default function ProfilePage() {
   const [credits, setCredits] = useState(0);
   const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
   const [pinnedCount, setPinnedCount] = useState(0);
+  const [stats, setStats] = useState<Record<string, { downloads: number; earned: number }>>({});
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [tab, setTab] = useState<"uploads" | "downloaded">("uploads");
@@ -243,7 +244,7 @@ export default function ProfilePage() {
     }
     const uid = data.user.id;
 
-    const [{ data: profile }, { data: resources }, { data: downloads }, { count: pins }] = await Promise.all([
+    const [{ data: profile }, { data: resources }, { data: downloads }, { count: pins }, { data: uploadStats }] = await Promise.all([
       supabase.from("profiles").select("credits, majors ( id, name )").eq("id", uid).maybeSingle(),
       supabase
         .from("resources")
@@ -256,12 +257,21 @@ export default function ProfilePage() {
         .eq("user_id", uid)
         .order("created_at", { ascending: false }),
       supabase.from("user_courses").select("course_id", { count: "exact", head: true }).eq("user_id", uid),
+      supabase.from("my_upload_stats").select("resource_id, downloads, earned"),
     ]);
 
     setUser(data.user);
     setCredits(profile?.credits ?? 0);
     setProgram(one(profile?.majors as { id: string; name: string } | { id: string; name: string }[] | null));
     setPinnedCount(pins ?? 0);
+    setStats(
+      Object.fromEntries(
+        ((uploadStats ?? []) as { resource_id: string; downloads: number; earned: number }[]).map((r) => [
+          r.resource_id,
+          { downloads: r.downloads, earned: r.earned },
+        ])
+      )
+    );
     setUploads((resources ?? []) as Upload[]);
     setPurchases(
       ((downloads ?? []) as DownloadRow[]).map((d) => ({
@@ -418,6 +428,13 @@ export default function ProfilePage() {
                   <p className="min-w-0 truncate font-medium">{u.title}</p>
                   <span className={cn("shrink-0 capitalize", STATUS_BADGE[u.status] ?? "badge-neutral")}>{u.status}</span>
                 </div>
+                {u.status === "approved" && (
+                  <p className="mt-1 text-xs muted">
+                    {stats[u.id]
+                      ? `${stats[u.id].downloads} download${stats[u.id].downloads === 1 ? "" : "s"} · earned ${stats[u.id].earned} credit${stats[u.id].earned === 1 ? "" : "s"}`
+                      : "No downloads yet — you earn 1 credit each time someone gets it"}
+                  </p>
+                )}
                 {u.status === "rejected" && u.rejected_reason && (
                   <p className="mt-1 text-xs text-rose-500">Reason: {u.rejected_reason}</p>
                 )}

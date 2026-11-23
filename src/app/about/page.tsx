@@ -18,7 +18,7 @@ const steps = [
   },
   {
     title: "Earn credits",
-    body: "Once approved, you earn credits based on how substantial the resource is.",
+    body: "You earn credits when it's approved, then again every time someone downloads it.",
   },
   {
     title: "Download",
@@ -61,16 +61,19 @@ export default function AboutPage() {
       <div className="card">
         <h2 className="h2">Credits</h2>
         <ul className="mt-3 space-y-2 prose-body">
-          <li>• New accounts start with <strong>20 credits</strong>.</li>
+          <li>• New accounts start with <strong>10 credits</strong>.</li>
           <li>
-            • A download costs roughly <strong>1 credit per 5 pages</strong> (minimum 1, maximum
-            20). You only pay once per resource.
+            • A file costs <strong>2 credits</strong>. You only pay once — re-opening it is free.
+            Moderators may price exceptional material higher.
           </li>
           <li>
-            • An approved upload earns about <strong>60% of its download cost</strong>. Moderators
-            can raise this for especially high-quality material.
+            • When a moderator approves your upload you get <strong>+2 credits</strong>, and your
+            first approved upload earns a <strong>+10 bonus</strong>.
           </li>
-          <li>• Your first approved upload earns a <strong>+3 bonus</strong>.</li>
+          <li>
+            • Every time someone downloads your file, <strong>you earn half the price</strong> (1
+            credit for a normal file). Good uploads keep paying.
+          </li>
           <li>
             • Short on credits? You can{" "}
             <Link href="/credits" className="underline underline-offset-4">

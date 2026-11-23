@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     page_count = 1; // fallback; mod can adjust later
   }
 
-  const cost = downloadCost(page_count); // DB trigger recomputes (and applies mod overrides)
+  const cost = downloadCost(); // DB trigger recomputes (and applies mod overrides)
 
   const { data: inserted, error: insErr } = await admin
     .from("resources")

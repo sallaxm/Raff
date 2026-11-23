@@ -73,8 +73,8 @@ export default async function HomePage() {
             <div className="flex items-center gap-2 text-sm muted">
               <Coins size={16} /> {user ? "Your credits" : "New here?"}
             </div>
-            <div className="mt-1 text-2xl font-semibold">{user ? credits : "Get 20 free"}</div>
-            <div className="mt-1 text-xs muted">{user ? "Top up or upload to earn more" : "Sign up to start downloading"}</div>
+            <div className="mt-1 text-2xl font-semibold">{user ? credits : "Get 10 free"}</div>
+            <div className="mt-1 text-xs muted">{user ? "Upload to earn more, or top up" : "Sign up — every file is 2 credits"}</div>
           </Link>
         </div>
       </section>
@@ -140,7 +140,7 @@ export default async function HomePage() {
           {[
             { href: "/browse", icon: GraduationCap, title: "Pick your program", text: "Every UDST bachelor, diploma and master's study plan, year by year." },
             { href: "/search", icon: FileText, title: "Open a course", text: "Every past paper, note and lab for that course in one list." },
-            { href: "/profile", icon: Sparkles, title: "Share & earn", text: "Sign up free, upload your own material and earn credits." },
+            { href: "/profile", icon: Sparkles, title: "Share & earn", text: "Earn credits every time someone downloads your upload." },
           ].map(({ href, icon: Icon, title, text }) => (
             <Link key={title} href={href} className="card card-hover">
               <Icon size={18} className="text-blue-600 dark:text-blue-400" />

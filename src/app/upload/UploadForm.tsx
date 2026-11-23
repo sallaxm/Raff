@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PDFDocument } from "pdf-lib";
 import { BookOpen, Search, UploadCloud, X } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
-import { downloadCost, FIRST_UPLOAD_BONUS, plural, uploadReward } from "@/lib/credits";
+import { APPROVAL_REWARD, downloadCost, FIRST_UPLOAD_BONUS, uploaderShare } from "@/lib/credits";
 import { cn } from "@/lib/format";
 
 export type CourseOption = { id: string; code: string; name: string; institution_id: string };
@@ -165,11 +165,7 @@ export default function UploadForm({
   const [detectedPages, setDetectedPages] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [done, setDone] = useState<{ courseId: string | null; reward: number } | null>(null);
-
-  const estimate = file
-    ? { pages: detectedPages ?? 1, reward: uploadReward(downloadCost(detectedPages ?? 1)) }
-    : null;
+  const [done, setDone] = useState<{ courseId: string | null } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -199,7 +195,7 @@ export default function UploadForm({
       if (uploadError) return fail(uploadError.message);
 
       const pageCount = detectedPages ?? 1;
-      const cost = downloadCost(pageCount); // the database recomputes this too
+      const cost = downloadCost(); // the database recomputes this too
 
       const { error: insertError } = await supabase.from("resources").insert({
         institution_id: target === "course" ? course!.institution_id : program!.institution_id,
@@ -219,7 +215,7 @@ export default function UploadForm({
         return fail(insertError.message);
       }
 
-      setDone({ courseId: target === "course" ? course!.id : null, reward: uploadReward(cost) });
+      setDone({ courseId: target === "course" ? course!.id : null });
       setTitle("");
       setFile(null);
     } finally {
@@ -232,8 +228,8 @@ export default function UploadForm({
       <section className="card space-y-3 text-center">
         <p className="text-lg font-semibold">Uploaded — thank you!</p>
         <p className="text-sm muted">
-          A moderator will review it soon. You&apos;ll get about {plural(done.reward, "credit")} once it&apos;s approved
-          (plus {FIRST_UPLOAD_BONUS} bonus if it&apos;s your first).
+          A moderator will review it soon. Once it&apos;s approved you get +{APPROVAL_REWARD} credits (+
+          {FIRST_UPLOAD_BONUS} more if it&apos;s your first), then +{uploaderShare()} every time someone downloads it.
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           <button type="button" onClick={() => setDone(null)} className="btn-primary">
@@ -320,16 +316,10 @@ export default function UploadForm({
       </div>
 
       <div className="rounded-2xl bg-gradient-to-r from-blue-100 to-pink-100 px-4 py-3 text-sm dark:from-zinc-800 dark:to-zinc-700">
-        {estimate ? (
-          <>
-            <span className="font-medium">Estimated reward: {plural(estimate.reward, "credit")}</span>
-            <span className="opacity-70">
-              {" "}· {plural(estimate.pages, "page")} {detectedPages == null ? "(not detected)" : "detected"} · +{FIRST_UPLOAD_BONUS} bonus on your first approved upload
-            </span>
-          </>
-        ) : (
-          <span className="opacity-70">Choose a file to see your estimated reward.</span>
-        )}
+        <span className="font-medium">
+          +{APPROVAL_REWARD} credits when approved, then +{uploaderShare()} every time someone downloads it.
+        </span>
+        <span className="opacity-70"> Your first approved upload also earns a +{FIRST_UPLOAD_BONUS} bonus.</span>
       </div>
 
       {msg && <p className={msg.ok ? "notice-success" : "notice-error"}>{msg.text}</p>}
