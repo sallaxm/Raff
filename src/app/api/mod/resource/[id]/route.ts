@@ -30,7 +30,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
 
-  const { data: resource, error: readErr } = await supabaseAdmin
+  const admin = supabaseAdmin();
+
+  const { data: resource, error: readErr } = await admin
     .from("resources")
     .select("id,storage_path")
     .eq("id", id)
@@ -45,7 +47,7 @@ export async function DELETE(
   }
 
   if (resource.storage_path) {
-    const { error: storageErr } = await supabaseAdmin.storage
+    const { error: storageErr } = await admin.storage
       .from("resources")
       .remove([resource.storage_path]);
 
@@ -54,7 +56,7 @@ export async function DELETE(
     }
   }
 
-  const { error: deleteErr } = await supabaseAdmin
+  const { error: deleteErr } = await admin
     .from("resources")
     .delete()
     .eq("id", id);
