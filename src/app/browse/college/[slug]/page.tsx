@@ -1,76 +1,86 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
+
+const LEVELS = [
+  { key: "bachelor", label: "Bachelor's degrees" },
+  { key: "advanced-diploma", label: "Advanced diplomas" },
+  { key: "diploma", label: "Diplomas" },
+  { key: "master", label: "Master's degrees" },
+  { key: "other", label: "Other programs" },
+];
 
 export default async function CollegeMajorsPage({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  // ✅ Next 16 requires awaiting params
   const { slug } = await params;
-
   const supabase = await supabaseServer();
 
-  // Get the college
-  const { data: college, error: collegeError } = await supabase
+  const { data: college, error } = await supabase
     .from("colleges")
-    .select("id, name, institution_id, slug")
-    .eq("slug", slug)
-    .maybeSingle(); // safer than .single()
-
-  if (collegeError) {
-    return <main className="p-6">Error: {collegeError.message}</main>;
-  }
-
-  if (!college) {
-    return <main className="p-6">College not found.</main>;
-  }
-
-  // Get majors inside this college
-  const { data: majors, error: majorsError } = await supabase
-    .from("majors")
     .select("id, name")
+    .eq("slug", slug)
+    .maybeSingle();
+
+  if (error) {
+    return <main className="page-narrow"><p className="notice-error">{error.message}</p></main>;
+  }
+  if (!college) notFound();
+
+  const { data: majorRows, error: majorsError } = await supabase
+    .from("majors")
+    .select("id, name, short_name, level, major_courses ( count )")
     .eq("college_id", college.id)
     .order("name");
 
-  if (majorsError) {
-    return <main className="p-6">Error: {majorsError.message}</main>;
-  }
+  const majors = (majorRows ?? []).map((m) => ({
+    id: m.id as string,
+    name: m.name as string,
+    shortName: (m.short_name as string | null) ?? null,
+    level: (m.level as string | null) ?? "other",
+    courses: ((m.major_courses as { count: number }[] | null)?.[0]?.count ?? 0) as number,
+  }));
+
+  const groups = LEVELS.map((l) => ({ ...l, items: majors.filter((m) => m.level === l.key) })).filter((g) => g.items.length);
 
   return (
-    <main className="max-w-2xl mx-auto p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <main className="page-narrow">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">{college.name}</h1>
-          <p className="text-zinc-500">Majors</p>
+          <h1 className="h1">{college.name}</h1>
+          <p className="muted">Choose your program to see its study plan</p>
         </div>
-
-        <Link
-          href="/browse"
-          className="text-sm px-3 py-2 rounded-full border border-zinc-200 dark:border-zinc-700"
-        >
-          Back
+        <Link href="/browse" className="btn-secondary">
+          <ArrowLeft size={14} /> Back
         </Link>
       </div>
 
-      <div className="space-y-3">
-        {majors?.map((m) => (
-          <Link
-            key={m.id}
-            href={`/browse/major/${m.id}`}
-            className="
-              block p-5 rounded-3xl border border-zinc-200 bg-white shadow-sm
-              hover:shadow-md transition
-              dark:bg-zinc-900 dark:border-zinc-800
-            "
-          >
-            <div className="text-lg font-semibold">{m.name}</div>
-          </Link>
-        ))}
-      </div>
+      {majorsError && <p className="notice-error">{majorsError.message}</p>}
 
-      {(!majors || majors.length === 0) && (
-        <p className="text-zinc-500">No majors found.</p>
+      {!majors?.length ? (
+        <p className="card text-sm muted">No majors found.</p>
+      ) : (
+        <div className="space-y-6">
+          {groups.map((g) => (
+            <section key={g.key} className="space-y-2">
+              {groups.length > 1 && <h2 className="h2">{g.label}</h2>}
+              {g.items.map((m) => (
+                <Link key={m.id} href={`/browse/major/${m.id}`} className="card card-hover flex items-center justify-between gap-4 py-4">
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{m.name}</span>
+                    <span className="block text-xs muted">
+                      {[m.shortName, m.courses ? `${m.courses} courses` : "Study plan coming soon"].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+                </Link>
+              ))}
+            </section>
+          ))}
+        </div>
       )}
     </main>
   );

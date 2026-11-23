@@ -5,6 +5,8 @@ export function supabaseBrowser() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    // During static prerender there's no window; return a stub so builds
+    // without env vars don't crash. Real usage always happens client-side.
     if (typeof window === "undefined") {
       return {} as unknown as ReturnType<typeof createBrowserClient>;
     }

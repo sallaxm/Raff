@@ -1,259 +1,218 @@
 import Link from "next/link";
-import HomeSearch from "./_components/HomeSearch";
+import { ArrowRight, Coins, FileText, GraduationCap, Sparkles } from "lucide-react";
+import SearchBox from "./_components/SearchBox";
+import CourseCard from "@/components/course/CourseCard";
 import { supabaseServer } from "@/lib/supabase/server";
+import { getCourseCounts, getStudentContext } from "@/lib/courses";
+import { one, timeAgo } from "@/lib/format";
 
-type LatestResource = {
+type Course = { id: string; code: string; name: string };
+
+type LatestRow = {
   id: string;
   title: string;
   type: string;
-  cost: number;
-  page_count: number | null;
   created_at: string;
-  courses: { code: string; name: string } | null;
+  courses: Course | Course[] | null;
 };
-
-function timeAgo(iso: string) {
-  const d = new Date(iso).getTime();
-  const now = Date.now();
-  const s = Math.max(1, Math.floor((now - d) / 1000));
-
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return `${h}h ago`;
-
-  const days = Math.floor(h / 24);
-  return `${days}d ago`;
-}
 
 export default async function HomePage() {
   const supabase = await supabaseServer();
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth.user ?? null;
 
-  const { data: u } = await supabase.auth.getUser();
-  const user = u.user ?? null;
+  const [profileRes, latestRes, popularRes, ctx] = await Promise.all([
+    user
+      ? supabase.from("profiles").select("credits, majors ( id, name, short_name )").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("resources")
+      .select("id, title, type, created_at, courses ( id, code, name )")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(6),
+    supabase
+      .from("course_resource_counts")
+      .select("course_id, resource_count")
+      .order("resource_count", { ascending: false })
+      .limit(6),
+    getStudentContext(supabase, user?.id ?? null),
+  ]);
 
-  let credits: number | null = null;
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    credits = profile?.credits ?? 0;
-  }
-
-  const { data: latest } = await supabase
-    .from("resources")
-    .select(
-      `
-      id,
-      title,
-      type,
-      cost,
-      page_count,
-      created_at,
-      courses (
-        code,
-        name
-      )
-    `
-    )
-    .eq("status", "approved")
-    .order("created_at", { ascending: false })
-    .limit(12);
-
-  const latestRows: LatestResource[] = ((latest ?? []) as Array<{
-    id: string;
-    title: string;
-    type: string;
-    cost: number;
-    page_count: number | null;
-    created_at: string;
-    courses: { code: string; name: string } | { code: string; name: string }[] | null;
-  }>)
-    .map((row) => ({
-      ...row,
-      courses: Array.isArray(row.courses) ? (row.courses[0] ?? null) : row.courses,
-    }));
+  const credits = user ? (profileRes.data?.credits ?? 0) : null;
+  const major = one(
+    (profileRes.data as { majors?: { id: string; name: string; short_name: string | null } | null } | null)?.majors ?? null
+  );
+  const pinnedCounts = await getCourseCounts(supabase, ctx.pinned.map((c) => c.id));
+  const latest = ((latestRes.data ?? []) as LatestRow[]).map(({ courses, ...r }) => ({ ...r, course: one(courses) }));
+  const popularRows = (popularRes.data ?? []) as { course_id: string; resource_count: number }[];
+  const { data: popularCourses } = popularRows.length
+    ? await supabase.from("courses").select("id, code, name").in("id", popularRows.map((p) => p.course_id))
+    : { data: [] as Course[] };
+  const popular = popularRows
+    .map((p) => ({ course: (popularCourses ?? []).find((c) => c.id === p.course_id), count: p.resource_count }))
+    .filter((p): p is { course: Course; count: number } => Boolean(p.course));
+  const pinnedIds = new Set(ctx.pinned.map((c) => c.id));
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
-      
-      {/* HERO */}
-      <section
-        className="
-          relative overflow-hidden backdrop-blur-xl
-          rounded-[32px] p-6 md:p-8
-          border border-zinc-200
-          shadow-sm
-
-          bg-gradient-to-br 
-          from-pink-100/70 
-          via-blue-100/60 
-          to-purple-100/70
-
-          dark:from-zinc-900
-          dark:via-zinc-900
-          dark:to-zinc-800
-        "
-      >
-        {/* Glass glow overlay */}
-        <div
-          className="
-            pointer-events-none
-            absolute inset-0
-            bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.6),transparent_40%),
-                radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.5),transparent_40%)]
-          "
-        />
-
-        <div className="relative flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          
-          {/* LEFT */}
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              Share smarter. Study faster.
-            </h1>
-
-            <p className="text-zinc-600 dark:text-zinc-300 max-w-xl">
-              Past papers, notes, assignments — organized by college, major, and course.
+    <main className="page">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-[32px] border border-zinc-200/80 bg-gradient-to-br from-pink-100/70 via-blue-100/60 to-purple-100/70 p-6 shadow-sm md:p-8 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800">
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+          <div className="max-w-xl flex-1 space-y-3">
+            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Find files for your course.</h1>
+            <p className="prose-body">
+              Past papers, notes and labs from UDST students, organised by course. Search a course code to start.
             </p>
-
-            <div className="mt-4 max-w-md">
-              <HomeSearch />
+            <div className="pt-1">
+              <SearchBox size="lg" />
             </div>
           </div>
 
-          {/* RIGHT — Credits card */}
-          <div
-            className="
-              shrink-0 w-full md:w-[280px]
-              rounded-3xl p-4
-              bg-white/70 backdrop-blur-xl
-              border border-white/40
-              shadow-sm
-
-              dark:bg-zinc-900/70
-              dark:border-zinc-800
-            "
-          >
-            <div className="text-sm text-zinc-500">
-              Your credits
+          <Link href={user ? "/credits" : "/profile"} className="card card-hover w-full shrink-0 md:w-[220px]">
+            <div className="flex items-center gap-2 text-sm muted">
+              <Coins size={16} /> {user ? "Your credits" : "New here?"}
             </div>
-
-            <div className="text-2xl font-semibold mt-1">
-              {user ? credits : "Sign in"}
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <Link
-                href="/profile"
-                className="
-                  px-4 py-2 rounded-2xl
-                  bg-black text-white text-sm
-                  hover:opacity-90 transition
-                  dark:bg-white dark:text-black
-                "
-              >
-                {user ? "Profile" : "Sign in"}
-              </Link>
-
-              <Link
-                href="/upload"
-                className="
-                  px-4 py-2 rounded-2xl
-                  border border-zinc-200 text-sm
-                  hover:bg-zinc-50 transition
-                  dark:border-zinc-800 dark:hover:bg-zinc-900
-                "
-              >
-                Upload
-              </Link>
-            </div>
-          </div>
-
+            <div className="mt-1 text-2xl font-semibold">{user ? credits : "Get 20 free"}</div>
+            <div className="mt-1 text-xs muted">{user ? "Top up or upload to earn more" : "Sign up to start downloading"}</div>
+          </Link>
         </div>
       </section>
 
-      {/* LATEST */}
+      {/* My courses */}
+      {user && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="h2">My courses</h2>
+              <p className="text-sm muted">
+                {major ? (
+                  <>
+                    {major.short_name ?? major.name} ·{" "}
+                    <Link href={`/browse/major/${major.id}`} className="underline underline-offset-4">
+                      study plan
+                    </Link>
+                  </>
+                ) : (
+                  "Pin the courses you're taking for one-tap access"
+                )}
+              </p>
+            </div>
+            {ctx.pinned.length > 0 && (
+              <Link href={major ? `/browse/major/${major.id}` : "/browse"} className="btn-ghost">
+                Edit <ArrowRight size={14} />
+              </Link>
+            )}
+          </div>
+
+          {ctx.pinned.length > 0 ? (
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              {ctx.pinned.map((c) => (
+                <CourseCard key={c.id} course={c} count={pinnedCounts.get(c.id) ?? 0} pinned />
+              ))}
+            </div>
+          ) : (
+            <Link
+              href={major ? `/browse/major/${major.id}` : "/browse"}
+              className="card card-hover flex items-center gap-4 border-dashed"
+            >
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                <GraduationCap size={20} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold">
+                  {major ? "Pick this semester's courses" : "Choose your program"}
+                </span>
+                <span className="block text-sm muted">
+                  {major
+                    ? "Open your study plan and tap the bookmark on each course you're taking."
+                    : "We'll show your study plan year by year so you can pin your courses."}
+                </span>
+              </span>
+              <ArrowRight size={18} className="shrink-0 text-zinc-400" />
+            </Link>
+          )}
+        </section>
+      )}
+
+      {!user && (
+        <section className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          {[
+            { href: "/browse", icon: GraduationCap, title: "Pick your program", text: "Every UDST bachelor, diploma and master's study plan, year by year." },
+            { href: "/search", icon: FileText, title: "Open a course", text: "Every past paper, note and lab for that course in one list." },
+            { href: "/profile", icon: Sparkles, title: "Share & earn", text: "Sign up free, upload your own material and earn credits." },
+          ].map(({ href, icon: Icon, title, text }) => (
+            <Link key={title} href={href} className="card card-hover">
+              <Icon size={18} className="text-blue-600 dark:text-blue-400" />
+              <div className="mt-2 font-semibold">{title}</div>
+              <p className="mt-1 text-sm muted">{text}</p>
+            </Link>
+          ))}
+        </section>
+      )}
+
+      {/* Popular courses */}
+      {popular.length > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between">
+            <div>
+              <h2 className="h2">Courses with the most files</h2>
+              <p className="text-sm muted">Where students are sharing the most</p>
+            </div>
+            <Link href="/browse" className="btn-ghost">
+              All programs <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+            {popular.map((p) => (
+              <CourseCard
+                key={p.course.id}
+                course={p.course}
+                count={p.count}
+                pinned={pinnedIds.has(p.course.id)}
+                showPin={Boolean(user)}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Latest */}
       <section className="space-y-3">
         <div className="flex items-end justify-between">
           <div>
-            <h2 className="text-xl font-semibold">
-              Latest uploads
-            </h2>
-            <p className="text-zinc-500 text-sm">
-              Newly approved resources
-            </p>
+            <h2 className="h2">Latest uploads</h2>
+            <p className="text-sm muted">Newly approved files</p>
           </div>
-
-          <Link
-            href="/resources"
-            className="
-              text-sm text-zinc-600
-              hover:text-zinc-900
-              dark:text-zinc-300
-              dark:hover:text-white
-            "
-          >
-            View all →
+          <Link href="/resources" className="btn-ghost">
+            All files <ArrowRight size={14} />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {latestRows.map((r) => (
-            <Link
-              key={r.id}
-              href="/resources"
-              className="
-                block rounded-3xl
-                border border-zinc-200
-                bg-white p-4 shadow-sm
-                hover:shadow-md transition
-
-                dark:bg-zinc-900
-                dark:border-zinc-800
-              "
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-semibold truncate">
-                    {r.title}
+        {latest.length === 0 ? (
+          <p className="card text-sm muted">No uploads yet — be the first!</p>
+        ) : (
+          <ul className="card divide-y divide-zinc-100 p-0 dark:divide-zinc-800">
+            {latest.map((r) => (
+              <li key={r.id}>
+                <Link
+                  href={r.course ? `/course/${r.course.id}` : "/resources"}
+                  className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                >
+                  <FileText size={18} className="shrink-0 text-zinc-400" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-medium">{r.title}</div>
+                    <div className="truncate text-xs muted">
+                      {r.course ? `${r.course.code} · ${r.course.name}` : "Whole program"} · {r.type} · {timeAgo(r.created_at)}
+                    </div>
                   </div>
-
-                  <div className="text-sm text-zinc-500 truncate">
-                    {r.courses?.code
-                      ? `${r.courses.code} • ${r.courses.name}`
-                      : "Course"}{" "}
-                    • {r.type}
-                  </div>
-
-                  <div className="text-xs text-zinc-400 mt-1">
-                    {r.created_at ? timeAgo(r.created_at) : ""}
-                    {typeof r.page_count === "number"
-                      ? ` • ${r.page_count} pages`
-                      : ""}
-                  </div>
-                </div>
-
-                <div className="text-sm font-semibold shrink-0">
-                  {r.cost} credits
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {(latest ?? []).length === 0 && (
-          <p className="text-sm text-zinc-500">
-            No uploads yet.
-          </p>
+                  <ArrowRight size={16} className="shrink-0 text-zinc-300" />
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
-
     </main>
   );
 }

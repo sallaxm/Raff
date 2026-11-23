@@ -1,107 +1,145 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import {
+  BookOpen,
+  Coins,
+  FileText,
+  FolderSearch,
+  Home,
+  Search,
+  Info,
+  MessageSquare,
+  Shield,
+  ShieldCheck,
+  Upload,
+  User,
+  type LucideIcon,
+} from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { cn } from "@/lib/format";
 
-function Section({ title }: { title: string }) {
-  return (
-    <div className="pt-4 pb-1 px-3 text-[11px] font-semibold tracking-wider text-zinc-400">
-      {title}
-    </div>
-  );
+type Item = { href: string; label: string; icon: LucideIcon };
+
+const SECTIONS: { title: string; items: Item[] }[] = [
+  {
+    title: "Main",
+    items: [
+      { href: "/", label: "Home", icon: Home },
+      { href: "/search", label: "Search", icon: Search },
+      { href: "/browse", label: "Programs", icon: FolderSearch },
+      { href: "/resources", label: "All files", icon: FileText },
+      { href: "/upload", label: "Upload", icon: Upload },
+    ],
+  },
+  {
+    title: "Account",
+    items: [
+      { href: "/credits", label: "Credits", icon: Coins },
+      { href: "/profile", label: "Profile", icon: User },
+    ],
+  },
+  {
+    title: "Info",
+    items: [
+      { href: "/guidelines", label: "Guidelines", icon: BookOpen },
+      { href: "/feedback", label: "Feedback", icon: MessageSquare },
+      { href: "/privacy", label: "Privacy", icon: Shield },
+      { href: "/about", label: "About", icon: Info },
+    ],
+  },
+];
+
+const MOD_ITEM: Item = { href: "/mod", label: "Moderator panel", icon: ShieldCheck };
+
+function isActive(pathname: string, href: string) {
+  if (href === "/") return pathname === "/";
+  return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavItem({ href, label }: { href: string; label: string }) {
+function NavLink({ item, active }: { item: Item; active: boolean }) {
+  const Icon = item.icon;
   return (
     <Link
-      href={href}
-      className="
-        flex items-center gap-2
-        px-3 py-2 rounded-2xl
-        text-sm text-zinc-700
-        hover:bg-white/60 transition
-        dark:text-zinc-200 dark:hover:bg-zinc-800/60
-      "
+      href={item.href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition",
+        active
+          ? "bg-zinc-900 text-white shadow-sm dark:bg-white dark:text-zinc-900"
+          : "text-zinc-700 hover:bg-white/70 dark:text-zinc-300 dark:hover:bg-zinc-800/60"
+      )}
     >
-      <span className="opacity-60">•</span>
-      {label}
+      <Icon size={16} className={active ? "" : "opacity-70"} />
+      {item.label}
     </Link>
   );
 }
 
 export default function SideNav() {
   const supabase = useMemo(() => supabaseBrowser(), []);
+  const pathname = usePathname();
   const [role, setRole] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) return;
 
       const { data: profile } = await supabase
         .from("profiles")
         .select("role, credits")
-        .eq("id", u.user.id)
+        .eq("id", auth.user.id)
         .maybeSingle();
 
       setRole(profile?.role ?? "user");
       setCredits(profile?.credits ?? 0);
     })();
-  }, [supabase]);
+    // Re-read on navigation so the balance stays fresh after downloads/purchases.
+  }, [supabase, pathname]);
 
   const isMod = role === "mod" || role === "admin";
 
   return (
-    <nav className="px-2 pb-4 overflow-y-auto no-scrollbar">
-      
-      {/* CREDIT CARD */}
+    <nav className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4">
       {credits !== null && (
-        <div
-          className="
-            mt-4 mx-2 p-3 rounded-2xl
-            bg-gradient-to-br from-blue-50 via-white to-pink-50
-            dark:from-zinc-900 dark:to-zinc-800
-            border border-zinc-200 dark:border-zinc-800
-            text-sm
-          "
+        <Link
+          href="/credits"
+          className="mb-2 mt-1 flex items-center justify-between rounded-2xl border border-zinc-200/80 bg-gradient-to-br from-blue-50 via-white to-pink-50 p-3 transition hover:shadow-sm dark:border-zinc-800 dark:from-zinc-900 dark:to-zinc-800"
         >
-          <div className="text-xs text-zinc-500">
-            Credits
-          </div>
-
-          <div className="text-xl font-semibold">
-            {credits}
-          </div>
-        </div>
+          <span>
+            <span className="block text-xs muted">Credits</span>
+            <span className="block text-xl font-semibold">{credits}</span>
+          </span>
+          <span className="rounded-full bg-zinc-900 px-3 py-1 text-xs font-medium text-white dark:bg-white dark:text-zinc-900">
+            Top up
+          </span>
+        </Link>
       )}
 
-      {/* MAIN */}
-      <Section title="MAIN" />
-      <NavItem href="/" label="Home" />
-      <NavItem href="/browse" label="Browse" />
-      <NavItem href="/resources" label="Resources" />
-      <NavItem href="/upload" label="Upload" />
+      {SECTIONS.map((section) => (
+        <div key={section.title}>
+          <div className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+            {section.title}
+          </div>
+          <div className="space-y-0.5">
+            {section.items.map((item) => (
+              <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} />
+            ))}
+          </div>
+        </div>
+      ))}
 
-      {/* ACCOUNT */}
-      <Section title="ACCOUNT" />
-      <NavItem href="/credits" label="Credits" />
-      <NavItem href="/profile" label="Profile" />
-
-      {/* INFO */}
-      <Section title="INFO" />
-      <NavItem href="/guidelines" label="Guidelines" />
-      <NavItem href="/feedback" label="Feedback" />
-      <NavItem href="/privacy" label="Privacy" />
-      <NavItem href="/about" label="About" />
-
-      {/* MOD */}
       {isMod && (
-        <>
-          <Section title="MODERATOR" />
-          <NavItem href="/mod" label="Moderator Panel" />
-        </>
+        <div>
+          <div className="px-3 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+            Moderator
+          </div>
+          <NavLink item={MOD_ITEM} active={isActive(pathname, MOD_ITEM.href)} />
+        </div>
       )}
     </nav>
   );

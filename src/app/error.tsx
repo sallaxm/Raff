@@ -14,15 +14,16 @@ export default function Error({
   }, [error]);
 
   return (
-    <main className="max-w-2xl mx-auto p-6">
-      <div className="rounded-3xl border border-zinc-200 bg-white/70 backdrop-blur-xl p-8 text-center dark:border-zinc-800 dark:bg-zinc-900/60">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
-        <p className="mt-2 text-zinc-600 dark:text-zinc-300">
+    <main className="mx-auto w-full max-w-md px-4 py-16 text-center">
+      <div className="card-hero space-y-3">
+        <h1 className="h2">Something went wrong</h1>
+        <p className="muted">
           Try again. If it keeps happening, let us know on the Feedback page.
         </p>
         <button
+          type="button"
           onClick={reset}
-          className="mt-6 px-5 py-2.5 rounded-2xl bg-black text-white text-sm hover:opacity-90 transition dark:bg-white dark:text-black"
+          className="btn-primary"
         >
           Try again
         </button>

@@ -1,174 +1,134 @@
-"use client";
+import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { supabaseServer } from "@/lib/supabase/server";
+import { cn } from "@/lib/format";
+import BuyCredits from "./BuyCredits";
 
-import { useEffect, useMemo, useState } from "react";
-import { supabaseBrowser } from "@/lib/supabase/browser";
+export const metadata: Metadata = { title: "Credits" };
 
 type Tx = {
   id: string;
-  user_id?: string;
   amount: number;
   kind: string;
   note: string | null;
   created_at: string;
 };
 
-function formatTxTitle(tx: Tx) {
-  // If you stored a human note, prefer it.
-  if (tx.note && tx.note.trim()) return tx.note.trim();
+const KIND_LABELS: Record<string, string> = {
+  STARTER: "Welcome credits",
+  UPLOAD_REWARD: "Upload approved",
+  UPLOAD_BONUS: "Upload bonus",
+  DOWNLOAD: "Downloaded a resource",
+  PURCHASE: "Bought credits",
+  REFUND: "Refund",
+  ADJUSTMENT: "Adjustment by Raff",
+  BOOST: "Boosted an upload",
+  BOUNTY_CREATE: "Posted a bounty",
+  BOUNTY_REFUND: "Bounty refunded",
+  BOUNTY_PAYOUT: "Won a bounty",
+};
 
-  const kind = (tx.kind || "").toUpperCase();
-
-  // Common kinds (adjust names if yours differ)
-  if (kind.includes("UPLOAD")) return "Earned credits from an upload";
-  if (kind.includes("DOWNLOAD")) return "Spent credits to download a resource";
-  if (kind.includes("PURCHASE")) return "Purchased credits";
-  if (kind.includes("REFUND")) return "Refunded credits";
-  if (kind.includes("ADJUST")) return "Admin adjustment";
-
-  // Fallback
-  return tx.kind || "Transaction";
+// Upload-reward notes are internal debug strings ("reward=…, base=…"); hide those.
+function txDetail(tx: Tx) {
+  if (!tx.note || tx.kind === "UPLOAD_REWARD") return null;
+  return tx.note;
 }
 
-function formatTxSubtitle(tx: Tx) {
-  const d = new Date(tx.created_at);
-  const when = d.toLocaleString();
+const PAYMENT_BANNERS: Record<string, { cls: string; text: string }> = {
+  paid: { cls: "notice-success", text: "Payment received — your credits have been added. Thank you!" },
+  pending: { cls: "notice", text: "Your payment is still processing. Credits will appear here once it's confirmed." },
+  cancelled: { cls: "notice", text: "Payment cancelled. You haven't been charged." },
+  failed: { cls: "notice-error", text: "Your payment didn't go through. You haven't been charged — please try again." },
+  error: { cls: "notice-error", text: "We couldn't confirm your payment yet. If you were charged, your credits will arrive shortly." },
+};
 
-  const amt = tx.amount;
-  if (amt > 0) return `${when} • +${amt} credits`;
-  if (amt < 0) return `${when} • ${amt} credits`;
-  return `${when} • 0 credits`;
-}
+export default async function CreditsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ payment?: string }>;
+}) {
+  const { payment } = await searchParams;
+  const supabase = await supabaseServer();
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) redirect("/profile?next=/credits");
 
-export default function CreditsPage() {
-  const supabase = useMemo(() => supabaseBrowser(), []);
-
-  const [rows, setRows] = useState<Tx[]>([]);
-  const [balance, setBalance] = useState<number>(0);
-  const [msg, setMsg] = useState("");
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function ensureProfile(uid: string) {
-    // Try read
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", uid)
-      .maybeSingle();
-
-    if (!error && profile) return profile;
-
-    // If missing, try create (works only if you have profiles_insert_own RLS policy)
-    const { data: inserted } = await supabase
-      .from("profiles")
-      .insert({
-        id: uid,
-        institution_id: "udst",
-        role: "user",
-        credits: 0,
-      })
-      .select("credits")
-      .maybeSingle();
-
-    return inserted ?? null;
-  }
-
-  async function load() {
-    setMsg("");
-
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) {
-      setMsg("Login first.");
-      return;
-    }
-
-    const uid = data.user.id;
-
-    // credits balance
-    const profile = await ensureProfile(uid);
-    setBalance(profile?.credits ?? 0);
-
-    // history (IMPORTANT: filter to this user)
-    const { data: tx, error: txErr } = await supabase
+  const [{ data: profile }, { data: txs, error: txErr }] = await Promise.all([
+    supabase.from("profiles").select("credits").eq("id", auth.user.id).maybeSingle(),
+    supabase
       .from("credit_transactions")
-      .select("id, amount, kind, note, created_at, user_id")
-      .eq("user_id", uid)
+      .select("id, amount, kind, note, created_at")
+      .eq("user_id", auth.user.id)
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(50),
+  ]);
 
-    if (txErr) {
-      setMsg(txErr.message);
-      setRows([]);
-      return;
-    }
-
-    setRows((tx ?? []) as Tx[]);
-  }
+  const rows = (txs ?? []) as Tx[];
+  const banner = payment ? PAYMENT_BANNERS[payment] : null;
 
   return (
-    <main className="max-w-3xl mx-auto p-8 space-y-6">
-      {/* Balance Card */}
-      <div
-        className="
-        rounded-3xl p-6
-        bg-gradient-to-br from-blue-50 via-white to-pink-50
-        dark:from-zinc-900 dark:to-zinc-800
-        border border-zinc-200 dark:border-zinc-800
-      "
-      >
-        <h1 className="text-3xl font-semibold">Credits</h1>
+    <main className="page-narrow">
+      {banner && <p className={banner.cls}>{banner.text}</p>}
 
-        <p className="text-4xl font-bold mt-3">{balance}</p>
+      <section className="card-hero">
+        <p className="text-sm muted">Available balance</p>
+        <p className="mt-1 text-5xl font-semibold tracking-tight">{profile?.credits ?? 0}</p>
+        <p className="mt-2 text-sm muted">
+          Earn credits by uploading useful material, or top up below.
+        </p>
+      </section>
 
-        <p className="text-sm text-zinc-500 mt-1">Available balance</p>
-      </div>
+      <BuyCredits />
 
-      {/* History */}
-      <div className="space-y-3">
-        <h2 className="text-xl font-semibold">History</h2>
+      <section className="space-y-3">
+        <h2 className="h2">History</h2>
 
-        {rows.map((tx) => {
-          const positive = tx.amount > 0;
+        {txErr && <p className="notice-error">{txErr.message}</p>}
 
-          return (
-            <div
-              key={tx.id}
-              className="
-                flex justify-between items-center
-                rounded-2xl p-4
-                border border-zinc-200
-                dark:border-zinc-800
-                bg-white dark:bg-zinc-900
-              "
-            >
-              <div>
-                <p className="font-medium">{formatTxTitle(tx)}</p>
-
-                <p className="text-xs text-zinc-500">{formatTxSubtitle(tx)}</p>
-              </div>
-
-              <div
-                className={`
-                  font-semibold
-                  ${positive ? "text-emerald-600" : "text-red-500"}
-                `}
-              >
-                {positive ? "+" : ""}
-                {tx.amount}
-              </div>
-            </div>
-          );
-        })}
-
-        {rows.length === 0 && (
-          <p className="text-zinc-500">No transactions yet.</p>
+        {rows.length === 0 ? (
+          <p className="card text-sm muted">No transactions yet.</p>
+        ) : (
+          <ul className="card divide-y divide-zinc-100 p-0 dark:divide-zinc-800">
+            {rows.map((tx) => {
+              const positive = tx.amount > 0;
+              const detail = txDetail(tx);
+              return (
+                <li key={tx.id} className="flex items-center gap-3 px-5 py-4">
+                  <span
+                    className={cn(
+                      "grid h-9 w-9 shrink-0 place-items-center rounded-full",
+                      positive
+                        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
+                        : "bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+                    )}
+                  >
+                    {positive ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{KIND_LABELS[tx.kind] ?? tx.kind}</p>
+                    <p className="truncate text-xs muted">
+                      {new Date(tx.created_at).toLocaleString("en-GB", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                      {detail ? ` · ${detail}` : ""}
+                    </p>
+                  </div>
+                  <span
+                    className={cn(
+                      "shrink-0 font-semibold tabular-nums",
+                      positive ? "text-emerald-600 dark:text-emerald-400" : "text-rose-500"
+                    )}
+                  >
+                    {positive ? "+" : ""}
+                    {tx.amount}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
-
-      {msg && <p className="text-sm text-red-500">{msg}</p>}
+      </section>
     </main>
   );
 }

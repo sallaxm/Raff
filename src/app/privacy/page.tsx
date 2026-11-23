@@ -2,29 +2,26 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy · Raff",
+  title: "Privacy",
   description: "What data Raff stores, why, and how to have it removed.",
 };
 
-const card =
-  "rounded-3xl border border-zinc-200 bg-white/70 backdrop-blur-xl p-6 dark:border-zinc-800 dark:bg-zinc-900/60";
-const muted = "text-zinc-600 dark:text-zinc-300";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-6">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <div className={`mt-2 space-y-2 ${muted}`}>{children}</div>
+      <h2 className="h2">{title}</h2>
+      <div className="mt-2 space-y-2 prose-body">{children}</div>
     </section>
   );
 }
 
 export default function PrivacyPage() {
   return (
-    <main className="max-w-3xl mx-auto p-6 space-y-6">
-      <div className={card}>
-        <h1 className="text-3xl font-semibold">Privacy</h1>
-        <p className={`mt-3 ${muted}`}>
+    <main className="page-narrow">
+      <div className="card">
+        <h1 className="h1">Privacy</h1>
+        <p className="mt-3 prose-body">
           This page explains, in plain language, what Raff stores about you and why. We only keep
           what’s needed to run accounts, moderation and the credit system.
         </p>
@@ -67,6 +64,14 @@ export default function PrivacyPage() {
           </ul>
         </Section>
 
+        <Section title="Payments">
+          <p>
+            If you buy credits, the payment is handled by Tap Payments. Your card details go
+            straight to Tap and are never sent to or stored by Raff. We keep a record of each
+            purchase (amount, credits and status) for support and accounting.
+          </p>
+        </Section>
+
         <Section title="Where it’s stored">
           <p>
             Accounts, the database and files are hosted with Supabase, and the website itself runs
@@ -86,7 +91,7 @@ export default function PrivacyPage() {
             You can ask us to correct your data, send you a copy of it, or delete your account.
             Deleting your account removes your profile and history; resources you uploaded may be
             removed or kept anonymously, depending on what you ask for. Use the{" "}
-            <Link href="/feedback" className="underline">
+            <Link href="/feedback" className="underline underline-offset-4">
               Feedback
             </Link>{" "}
             page and choose “Account / data request”.

@@ -1,61 +1,34 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getSessionUser, isModRole } from "@/lib/supabase/server";
 
-export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> }
-) {
-  const { id } = await ctx.params; // ✅ IMPORTANT
+const PREVIEW_TTL_SECONDS = 60 * 10;
 
-  const supabase = await supabaseServer();
+/** Signed preview URL. Mods can preview anything; others only approved files. */
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+  const { id } = await ctx.params;
 
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) {
-    return NextResponse.json({ error: "Not logged in" }, { status: 401 });
-  }
+  const { user, role } = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", auth.user.id)
-    .maybeSingle();
+  const admin = supabaseAdmin();
 
-  const isMod = profile?.role === "mod" || profile?.role === "admin";
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    return NextResponse.json(
-      { error: "Missing env: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY" },
-      { status: 500 }
-    );
-  }
-
-  const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
-
-  const { data: resource, error: rErr } = await admin
+  const { data: resource, error: readErr } = await admin
     .from("resources")
-    .select("storage_path,status")
+    .select("storage_path, status")
     .eq("id", id)
     .maybeSingle();
 
-  if (rErr) {
-    return NextResponse.json({ error: "DB error", debug: { message: rErr.message } }, { status: 500 });
-  }
+  if (readErr) return NextResponse.json({ error: readErr.message }, { status: 500 });
+  if (!resource) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (!resource) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  if (!isMod && resource.status !== "approved") {
+  if (!isModRole(role) && resource.status !== "approved") {
     return NextResponse.json({ error: "Not allowed" }, { status: 403 });
   }
 
   const { data, error } = await admin.storage
     .from("resources")
-    .createSignedUrl(resource.storage_path, 60 * 10);
+    .createSignedUrl(resource.storage_path, PREVIEW_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
     return NextResponse.json({ error: error?.message ?? "Signed URL failed" }, { status: 500 });

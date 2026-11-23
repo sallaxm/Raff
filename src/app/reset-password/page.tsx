@@ -115,68 +115,42 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="max-w-md mx-auto p-8">
-      <div
-        className="
-          rounded-3xl p-6
-          bg-gradient-to-br from-blue-50 via-white to-pink-50
-          dark:from-zinc-900 dark:to-zinc-800
-          border border-zinc-200 dark:border-zinc-800
-        "
+    <main className="mx-auto w-full max-w-md px-4 py-10">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void savePassword();
+        }}
+        className="card-hero space-y-4"
       >
-        <h1 className="text-3xl font-semibold">Set new password</h1>
-
-        <p className="text-sm text-zinc-500 mt-1">
-          Open this page from your reset email, then set a new password.
-        </p>
+        <div>
+          <h1 className="h1">Set a new password</h1>
+          <p className="mt-1 text-sm muted">Open this page from your reset email, then choose a new password.</p>
+        </div>
 
         <input
           type="password"
+          autoComplete="new-password"
           placeholder="New password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="
-            mt-4 w-full px-4 py-3 rounded-2xl
-            border border-zinc-200
-            bg-white
-            dark:bg-zinc-900 dark:border-zinc-700
-            outline-none
-            focus:ring-2 focus:ring-blue-200
-          "
+          className="input"
         />
-
         <input
           type="password"
+          autoComplete="new-password"
           placeholder="Confirm new password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          className="
-            mt-3 w-full px-4 py-3 rounded-2xl
-            border border-zinc-200
-            bg-white
-            dark:bg-zinc-900 dark:border-zinc-700
-            outline-none
-            focus:ring-2 focus:ring-blue-200
-          "
+          className="input"
         />
 
-        <button
-          onClick={savePassword}
-          disabled={saving || !ready}
-          className="
-            w-full mt-4 py-3 rounded-2xl
-            bg-black text-white
-            dark:bg-white dark:text-black
-            font-medium
-            hover:scale-[1.01] transition
-            disabled:opacity-50
-          "
-        >
-          {saving ? "Saving..." : "Update password"}
+        <button type="submit" disabled={saving || !ready} className="btn-primary btn-lg w-full">
+          {saving ? "Saving…" : "Update password"}
         </button>
 
-        {msg && <p className="text-sm mt-4 text-zinc-500">{msg}</p>}
-      </div>
+        {msg && <p className="notice">{msg}</p>}
+      </form>
     </main>
   );
 }
