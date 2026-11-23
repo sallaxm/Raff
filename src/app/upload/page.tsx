@@ -118,7 +118,9 @@ export default function UploadPage() {
   const [detectedPages, setDetectedPages] = useState<number | null>(null);
   const estimatedPageCount = file ? detectedPages ?? 1 : null;
   const estimatedCredits =
-    estimatedPageCount == null ? null : Math.max(1, Math.ceil(estimatedPageCount / 5));
+    estimatedPageCount == null
+      ? null
+      : Math.min(20, Math.max(1, Math.ceil(estimatedPageCount / 5)));
   const [lastUploadEstimate, setLastUploadEstimate] = useState<LastUploadEstimate | null>(null);
 
   const selectedCollege = useMemo(
@@ -283,7 +285,7 @@ export default function UploadPage() {
 
       // Page count: use detected pages (pdf/docx) else null (mod can set later)
       const pageCount = detectedPages ?? 1; // ✅ never null (DB requires NOT NULL)
-      const cost = Math.max(1, Math.ceil(pageCount / 5));
+      const cost = Math.min(20, Math.max(1, Math.ceil(pageCount / 5)));
 
       const payload: ResourceInsert = {
         institution_id: selectedCollege.institution_id,
