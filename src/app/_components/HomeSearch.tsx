@@ -2,12 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Search, X } from "lucide-react";
 
 export default function HomeSearch() {
   const router = useRouter();
   const [q, setQ] = useState("");
 
-  function go(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = q.trim();
     if (!trimmed) return;
@@ -15,55 +16,25 @@ export default function HomeSearch() {
   }
 
   return (
-    <form onSubmit={go} className="space-y-2">
-      <div
-        className="
-          flex items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-3 py-2
-          shadow-sm dark:bg-zinc-900 dark:border-zinc-800
-        "
-      >
-        <span className="text-zinc-400">⌕</span>
+    <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
+      <label className="flex flex-1 items-center gap-2 rounded-2xl border border-zinc-200 bg-white px-4 py-2.5 shadow-sm focus-within:ring-2 focus-within:ring-blue-100 dark:border-zinc-800 dark:bg-zinc-900 dark:focus-within:ring-blue-900/50">
+        <Search size={16} className="shrink-0 text-zinc-400" />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search past papers, notes, assignments…"
-          className="w-full bg-transparent outline-none text-sm"
+          aria-label="Search resources"
+          className="w-full bg-transparent text-sm outline-none"
         />
         {q && (
-          <button
-            type="button"
-            onClick={() => setQ("")}
-            className="text-xs px-2 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 transition dark:bg-zinc-800 dark:hover:bg-zinc-700"
-          >
-            Clear
+          <button type="button" onClick={() => setQ("")} aria-label="Clear search" className="text-zinc-400 hover:text-zinc-600">
+            <X size={16} />
           </button>
         )}
-      </div>
-
-      <div className="flex gap-2">
-        <button
-          type="submit"
-          className="
-            px-4 py-2 rounded-2xl bg-black text-white text-sm
-            hover:opacity-90 transition
-            dark:bg-white dark:text-black
-          "
-        >
-          Search
-        </button>
-
-        <button
-          type="button"
-          onClick={() => router.push("/browse")}
-          className="
-            px-4 py-2 rounded-2xl border border-zinc-200 text-sm
-            hover:bg-zinc-50 transition
-            dark:border-zinc-800 dark:hover:bg-zinc-900
-          "
-        >
-          Browse
-        </button>
-      </div>
+      </label>
+      <button type="submit" className="btn-primary">
+        Search
+      </button>
     </form>
   );
 }

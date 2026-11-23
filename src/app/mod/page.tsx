@@ -12,25 +12,13 @@ type Row = {
   created_at: string;
   uploader_id: string | null;
   course_id: string | null;
-  courses?: { code: string; name: string }[] | null; // ✅ array (Supabase returns array)
+  courses?: { code: string; name: string }[] | null;
 };
 
-const TYPES = ["Past Paper", "Notes", "Assignment", "Lab", "Other"];
+const TYPES = ["Past Paper", "Notes", "Assignment", "Lab", "Cheat Sheet", "Summary", "Other"];
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-[11px] font-semibold tracking-wide text-zinc-500 dark:text-zinc-400">
-      {children}
-    </div>
-  );
-}
-
-function Card({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl p-5 border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-      {children}
-    </div>
-  );
+  return <div className="label mb-0">{children}</div>;
 }
 
 export default function ModPage() {
@@ -131,7 +119,7 @@ export default function ModPage() {
         return;
       }
 
-      setMsg("Deleted 🗑️");
+      setMsg("Deleted.");
       setEditingId((current) => (current === id ? null : current));
       setDraft((current) => (current?.id === id ? null : current));
       setOpenPreviewId((current) => (current === id ? null : current));
@@ -157,7 +145,7 @@ export default function ModPage() {
 
     if (error) return setMsg(error.message);
 
-    setMsg("Rejected ❌");
+    setMsg("Rejected.");
     setEditingId(null);
     setDraft(null);
     setOpenPreviewId(null);
@@ -171,7 +159,7 @@ export default function ModPage() {
     const errorMessage = await saveResourceMetadata(draft);
     if (errorMessage) return setMsg(errorMessage);
 
-    setMsg("Saved metadata ✏️");
+    setMsg("Metadata saved.");
     setEditingId(null);
     setDraft(null);
     load();
@@ -188,7 +176,7 @@ export default function ModPage() {
     const approveError = await approve(id);
     if (approveError) return setMsg(approveError);
 
-    setMsg("Approved ✅");
+    setMsg("Approved — uploader has been credited.");
     setEditingId((current) => (current === id ? null : current));
     setDraft((current) => (current?.id === id ? null : current));
     await load();
@@ -229,25 +217,25 @@ export default function ModPage() {
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
+    <main className="page">
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-3xl font-semibold">Moderator</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            Preview, edit metadata, approve.
+          <h1 className="h1">Moderator</h1>
+          <p className="text-sm muted">
+            {rows.length} pending · preview, edit metadata, approve.
           </p>
         </div>
 
         <button
           onClick={load}
-          className="px-4 py-2 rounded-2xl text-sm border border-zinc-200 bg-white/60 hover:bg-white dark:border-zinc-800 dark:bg-zinc-900/50 dark:hover:bg-zinc-900 backdrop-blur"
+          className="btn-secondary"
         >
           Refresh
         </button>
       </div>
 
-      {msg && <p className="text-sm text-zinc-700 dark:text-zinc-200">{msg}</p>}
-      {loading && <p className="text-sm text-zinc-500">Loading…</p>}
+      {msg && <p className="notice">{msg}</p>}
+      {loading && <p className="text-sm muted">Loading…</p>}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {rows.map((r) => {
@@ -261,26 +249,26 @@ export default function ModPage() {
           const previewUrl = previewUrlById[r.id];
 
           return (
-            <Card key={r.id}>
+            <div key={r.id} className="card">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 w-full">
                   {!editing ? (
                     <>
-                      <div className="font-semibold text-lg text-zinc-900 dark:text-zinc-50 truncate">
+                      <div className="truncate text-lg font-semibold">
                         {r.title}
                       </div>
-                      <div className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                        {courseLine} • {r.type}
+                      <div className="mt-1 text-sm muted">
+                        {courseLine} · {r.type}
                       </div>
-                      <div className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
-                        cost {r.cost}
-                        {typeof r.page_count === "number" ? ` • ${r.page_count} pages` : ""}
+                      <div className="mt-1 text-xs text-zinc-400">
+                        {r.cost} credits
+                        {typeof r.page_count === "number" ? ` · ${r.page_count} pages` : ""}
                       </div>
                     </>
                   ) : (
                     <div className="space-y-3">
-                      <div className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
-                        Editing <span className="opacity-60">•</span>
+                      <div className="badge-neutral gap-2">
+                        Editing <span className="opacity-60">·</span>
                         <span className="font-normal">{courseLine}</span>
                       </div>
 
@@ -289,7 +277,7 @@ export default function ModPage() {
                         <input
                           value={draft?.title ?? ""}
                           onChange={(e) => setDraft({ ...draft!, title: e.target.value })}
-                          className="mt-1 w-full rounded-2xl px-3 py-2 text-sm border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
+                          className="input mt-1 px-3 py-2"
                         />
                       </div>
 
@@ -301,7 +289,7 @@ export default function ModPage() {
                             min={1}
                             value={Number(draft?.page_count ?? 1)}
                             onChange={(e) => setDraft({ ...draft!, page_count: Number(e.target.value) })}
-                            className="mt-1 w-full rounded-2xl px-3 py-2 text-sm border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
+                            className="input mt-1 px-3 py-2"
                           />
                         </div>
 
@@ -312,7 +300,7 @@ export default function ModPage() {
                             min={0}
                             value={Number(draft?.cost ?? 0)}
                             onChange={(e) => setDraft({ ...draft!, cost: Number(e.target.value) })}
-                            className="mt-1 w-full rounded-2xl px-3 py-2 text-sm border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50"
+                            className="input mt-1 px-3 py-2"
                           />
                         </div>
 
@@ -321,7 +309,7 @@ export default function ModPage() {
                           <select
                             value={draft?.type ?? "Other"}
                             onChange={(e) => setDraft({ ...draft!, type: e.target.value })}
-                            className="mt-1 w-full rounded-2xl px-3 py-2 text-sm border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-50 dark:[color-scheme:dark]"
+                            className="input mt-1 px-3 py-2"
                           >
                             {TYPES.map((t) => (
                               <option key={t} value={t}>
@@ -342,17 +330,17 @@ export default function ModPage() {
                       setDraft(r);
                       setMsg("");
                     }}
-                    className="shrink-0 px-4 py-2 rounded-2xl text-sm border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+                    className="btn-secondary shrink-0"
                   >
                     Edit
                   </button>
                 )}
               </div>
 
-              <div className="mt-4 flex gap-2 flex-wrap">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   onClick={() => togglePreview(r.id)}
-                  className="px-4 py-2 rounded-2xl text-sm border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+                  className="btn-secondary"
                 >
                   {previewOpen ? "Hide preview" : "Preview file"}
                 </button>
@@ -361,7 +349,7 @@ export default function ModPage() {
                   <>
                     <button
                       onClick={saveEdit}
-                      className="px-4 py-2 rounded-2xl text-sm bg-black text-white hover:opacity-90 dark:bg-white dark:text-black"
+                      className="btn-primary"
                     >
                       Save
                     </button>
@@ -372,7 +360,7 @@ export default function ModPage() {
                         setDraft(null);
                         setMsg("");
                       }}
-                      className="px-4 py-2 rounded-2xl text-sm border border-zinc-200 hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+                      className="btn-secondary"
                     >
                       Cancel
                     </button>
@@ -381,14 +369,14 @@ export default function ModPage() {
 
                 <button
                   onClick={() => approveWithDraft(r.id)}
-                  className="px-4 py-2 rounded-2xl text-sm bg-emerald-600 text-white hover:opacity-90"
+                  className="btn bg-emerald-600 text-white hover:bg-emerald-700"
                 >
                   Approve
                 </button>
 
                 <button
                   onClick={() => reject(r.id)}
-                  className="px-4 py-2 rounded-2xl text-sm bg-rose-500 text-white hover:opacity-90"
+                  className="btn bg-rose-500 text-white hover:bg-rose-600"
                 >
                   Reject
                 </button>
@@ -396,7 +384,7 @@ export default function ModPage() {
                 <button
                   onClick={() => deleteResource(r.id)}
                   disabled={deletingId === r.id}
-                  className="px-4 py-2 rounded-2xl text-sm border border-rose-300 text-rose-600 hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/30"
+                  className="btn-danger"
                 >
                   {deletingId === r.id ? "Deleting…" : "Delete file"}
                 </button>
@@ -404,7 +392,7 @@ export default function ModPage() {
 
               {previewOpen && (
                 <div className="mt-4">
-                  <div className="rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden bg-white dark:bg-zinc-950">
+                  <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
                     {previewLoading && <div className="p-4 text-sm text-zinc-500">Loading preview…</div>}
 
                     {!previewLoading && previewUrl && (
@@ -427,13 +415,13 @@ export default function ModPage() {
                   )}
                 </div>
               )}
-            </Card>
+            </div>
           );
         })}
       </div>
 
       {!loading && rows.length === 0 && (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">No pending uploads 🎉</p>
+        <p className="card text-sm muted">No pending uploads — all caught up 🎉</p>
       )}
     </main>
   );

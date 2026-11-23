@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const TITLE_MAX_LENGTH = 180;
 const TYPE_MAX_LENGTH = 60;
@@ -40,35 +40,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid file extension" }, { status: 400 });
   }
 
-  // Read the logged-in user from cookies (Next 16 safe)
-  const response = NextResponse.next();
-  const supabaseAuth = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
+  const supabaseAuth = await supabaseServer();
 
   const { data: userData } = await supabaseAuth.auth.getUser();
   const user = userData.user;
   if (!user) return NextResponse.json({ error: "Not logged in" }, { status: 401 });
 
-  // Use service role ONLY on the server (safe)
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const admin = supabaseAdmin();
 
   // Ensure profile exists (useful after local resets)
   await admin

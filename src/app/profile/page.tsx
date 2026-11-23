@@ -1,637 +1,407 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import { Coins, Download, LogOut } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { cn, one } from "@/lib/format";
 
-type Resource = {
+type Upload = {
   id: string;
   title: string;
-  status: string;
+  status: "approved" | "pending" | "rejected" | string;
   rejected_reason: string | null;
 };
 
-type DownloadedResource = {
-  id: string;
-  created_at: string;
-  resources: {
-    id: string;
-    title: string;
-    type: string;
-  } | null;
-};
+type LibraryResource = { id: string; title: string; type: string };
 
 type DownloadRow = {
   id: string;
   created_at: string;
-  resources:
-    | {
-        id: string;
-        title: string;
-        type: string;
-      }
-    | {
-        id: string;
-        title: string;
-        type: string;
-      }[]
-    | null;
+  resources: LibraryResource | LibraryResource[] | null;
 };
 
+type Purchase = { id: string; created_at: string; resource: LibraryResource | null };
+
+const STATUS_BADGE: Record<string, string> = {
+  approved: "badge-success",
+  pending: "badge-warning",
+  rejected: "badge-danger",
+};
+
+function siteBaseUrl() {
+  return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ?? window.location.origin;
+}
+
+/* ------------------------------------------------------------------ */
+/* Signed-out view                                                     */
+/* ------------------------------------------------------------------ */
+
+function AuthCard() {
+  const supabase = useMemo(() => supabaseBrowser(), []);
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg("");
+    if (!email || !password) {
+      setMsg("Please enter both email and password.");
+      return;
+    }
+
+    setBusy(true);
+    if (mode === "login") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setBusy(false);
+      if (error) return setMsg(error.message);
+
+      const next = new URLSearchParams(window.location.search).get("next");
+      window.location.replace(next?.startsWith("/") ? next : "/profile");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${siteBaseUrl()}/auth/callback` },
+    });
+    setBusy(false);
+
+    if (error) return setMsg(error.message);
+    if (!data.user?.identities?.length) {
+      return setMsg("This email is already registered. Try logging in or reset your password.");
+    }
+    setMsg("Confirmation link sent — check your inbox (and spam), then log in.");
+  }
+
+  async function resetPassword() {
+    setMsg("");
+    if (!email) return setMsg("Enter your email first, then tap “Forgot password”.");
+
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteBaseUrl()}/auth/callback?next=/reset-password`,
+    });
+    setBusy(false);
+    setMsg(error ? error.message : "Password reset link sent — check your inbox.");
+  }
+
+  return (
+    <main className="mx-auto w-full max-w-md px-4 py-10">
+      <form onSubmit={submit} className="card-hero space-y-4">
+        <div>
+          <h1 className="h1">{mode === "login" ? "Welcome back" : "Create your account"}</h1>
+          <p className="mt-1 text-sm muted">
+            {mode === "login"
+              ? "Log in with your email and password."
+              : "Sign up to start uploading and downloading resources. You get 20 free credits."}
+          </p>
+        </div>
+
+        <div className="segmented">
+          {(["login", "signup"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => {
+                setMsg("");
+                setMode(m);
+              }}
+              className={cn("segment", mode === m && "segment-active")}
+            >
+              {m === "login" ? "Log in" : "Sign up"}
+            </button>
+          ))}
+        </div>
+
+        <div className="space-y-3">
+          <input
+            type="email"
+            autoComplete="email"
+            placeholder="you@university.edu.qa"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="input"
+          />
+          <input
+            type="password"
+            autoComplete={mode === "login" ? "current-password" : "new-password"}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input"
+          />
+        </div>
+
+        <button type="submit" disabled={busy} className="btn-primary btn-lg w-full">
+          {busy ? "Working…" : mode === "login" ? "Log in" : "Create account"}
+        </button>
+
+        {mode === "login" && (
+          <button
+            type="button"
+            onClick={resetPassword}
+            disabled={busy}
+            className="text-sm muted underline underline-offset-4 hover:text-zinc-900 dark:hover:text-white"
+          >
+            Forgot password?
+          </button>
+        )}
+
+        {msg && <p className="notice">{msg}</p>}
+      </form>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Change password                                                     */
+/* ------------------------------------------------------------------ */
+
+function ChangePassword({ email }: { email: string }) {
+  const supabase = useMemo(() => supabaseBrowser(), []);
+  const [current, setCurrent] = useState("");
+  const [next, setNext] = useState("");
+  const [confirmNext, setConfirmNext] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+
+    const fail = (text: string) => setMsg({ ok: false, text });
+    if (!current || !next || !confirmNext) return fail("Please fill all password fields.");
+    if (next.length < 6) return fail("New password must be at least 6 characters.");
+    if (next !== confirmNext) return fail("New passwords do not match.");
+    if (current === next) return fail("New password must be different from the current one.");
+
+    setBusy(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password: current });
+    if (signInError) {
+      setBusy(false);
+      return fail("Current password is incorrect.");
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: next });
+    setBusy(false);
+    if (error) return fail(error.message);
+
+    setCurrent("");
+    setNext("");
+    setConfirmNext("");
+    setMsg({ ok: true, text: "Password updated." });
+  }
+
+  return (
+    <form onSubmit={submit} className="card space-y-3">
+      <div>
+        <h2 className="h2">Change password</h2>
+        <p className="text-xs muted">Update your password while signed in.</p>
+      </div>
+      <input type="password" autoComplete="current-password" placeholder="Current password" value={current} onChange={(e) => setCurrent(e.target.value)} className="input" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <input type="password" autoComplete="new-password" placeholder="New password" value={next} onChange={(e) => setNext(e.target.value)} className="input" />
+        <input type="password" autoComplete="new-password" placeholder="Confirm new password" value={confirmNext} onChange={(e) => setConfirmNext(e.target.value)} className="input" />
+      </div>
+      <button type="submit" disabled={busy} className="btn-primary">
+        {busy ? "Updating…" : "Update password"}
+      </button>
+      {msg && <p className={msg.ok ? "notice-success" : "notice-error"}>{msg.text}</p>}
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Page                                                                */
+/* ------------------------------------------------------------------ */
 
 export default function ProfilePage() {
   const supabase = useMemo(() => supabaseBrowser(), []);
 
   const [user, setUser] = useState<User | null>(null);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [credits, setCredits] = useState<number>(0);
-  const [uploads, setUploads] = useState<Resource[]>([]);
-  const [purchases, setPurchases] = useState<DownloadedResource[]>([]);
+  const [ready, setReady] = useState(false);
+  const [credits, setCredits] = useState(0);
+  const [uploads, setUploads] = useState<Upload[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [tab, setTab] = useState<"uploads" | "downloaded">("uploads");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
-  const [sending, setSending] = useState(false);
-  const [changeCurrentPassword, setChangeCurrentPassword] = useState("");
-  const [changeNewPassword, setChangeNewPassword] = useState("");
-  const [changeConfirmPassword, setChangeConfirmPassword] = useState("");
-  const [changePasswordMsg, setChangePasswordMsg] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-  const [activeTab, setActiveTab] = useState<"uploads" | "downloaded">("uploads");
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
   const load = useCallback(async () => {
     const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      setReady(true);
+      return;
+    }
+    const uid = data.user.id;
 
-    if (!data.user) return;
+    const [{ data: profile }, { data: resources }, { data: downloads }] = await Promise.all([
+      supabase.from("profiles").select("credits").eq("id", uid).maybeSingle(),
+      supabase
+        .from("resources")
+        .select("id, title, status, rejected_reason")
+        .eq("uploader_id", uid)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("downloads")
+        .select("id, created_at, resources ( id, title, type )")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false }),
+    ]);
 
     setUser(data.user);
-    setEmail(data.user.email ?? "");
-
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", data.user.id)
-      .single();
-
     setCredits(profile?.credits ?? 0);
-
-    const { data: resources } = await supabase
-      .from("resources")
-      .select("id,title,status,rejected_reason")
-      .eq("uploader_id", data.user.id)
-      .order("created_at", { ascending: false });
-
-    setUploads(resources ?? []);
-
-    const { data: downloads } = await supabase
-      .from("downloads")
-      .select(
-        `
-        id,
-        created_at,
-        resources ( id, title, type )
-      `
-      )
-      .eq("user_id", data.user.id)
-      .order("created_at", { ascending: false });
-
-    const normalizedPurchases: DownloadedResource[] = (downloads ?? []).map(
-      (download: DownloadRow) => ({
-        id: download.id,
-        created_at: download.created_at,
-        resources: Array.isArray(download.resources)
-          ? (download.resources[0] ?? null)
-          : download.resources,
-      })
+    setUploads((resources ?? []) as Upload[]);
+    setPurchases(
+      ((downloads ?? []) as DownloadRow[]).map((d) => ({
+        id: d.id,
+        created_at: d.created_at,
+        resource: one(d.resources),
+      }))
     );
-
-    setPurchases(normalizedPurchases);
+    setReady(true);
   }, [supabase]);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      void load();
-    }, 0);
-
+    const timer = setTimeout(() => void load(), 0);
     return () => clearTimeout(timer);
   }, [load]);
 
-  async function login() {
-    setMsg("");
-
-    if (!email || !password) {
-      setMsg("Please enter both email and password.");
-      return;
-    }
-
-    setSending(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    setSending(false);
-
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-
-    location.reload();
-  }
-
-  async function signup() {
-    setMsg("");
-
-    if (!email || !password) {
-      setMsg("Please enter both email and password.");
-      return;
-    }
-
-    setSending(true);
-
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-      window.location.origin;
-
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${baseUrl}/auth/callback`,
-      },
-    });
-
-    setSending(false);
-
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-
-    if (!data.user?.identities?.length) {
-      setMsg("This email is already registered. Try Login or reset your password.");
-      return;
-    }
-
-    setMsg("Confirmation link sent. Check your inbox/spam, then log in.");
-  }
-
-
-  async function resetPassword() {
-    setMsg("");
-
-    if (!email) {
-      setMsg("Enter your email first, then click Reset password.");
-      return;
-    }
-
-    setSending(true);
-
-    const baseUrl =
-      process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-      window.location.origin;
-
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${baseUrl}/auth/callback?next=/reset-password`,
-    });
-
-    setSending(false);
-
-    if (error) {
-      setMsg(error.message);
-      return;
-    }
-
-    setMsg("Password reset link sent. Check your inbox/spam.");
-  }
-
   async function logout() {
     await supabase.auth.signOut();
-    location.reload();
-  }
-
-  async function changePassword() {
-    setChangePasswordMsg("");
-
-    if (!user?.email) {
-      setChangePasswordMsg("Could not verify your account email. Please try again.");
-      return;
-    }
-
-    if (!changeCurrentPassword || !changeNewPassword || !changeConfirmPassword) {
-      setChangePasswordMsg("Please fill all password fields.");
-      return;
-    }
-
-    if (changeNewPassword.length < 6) {
-      setChangePasswordMsg("New password must be at least 6 characters.");
-      return;
-    }
-
-    if (changeNewPassword !== changeConfirmPassword) {
-      setChangePasswordMsg("New passwords do not match.");
-      return;
-    }
-
-    if (changeCurrentPassword === changeNewPassword) {
-      setChangePasswordMsg("New password must be different from current password.");
-      return;
-    }
-
-    setChangingPassword(true);
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: changeCurrentPassword,
-    });
-
-    if (signInError) {
-      setChangingPassword(false);
-      setChangePasswordMsg("Current password is incorrect.");
-      return;
-    }
-
-    const { error: updateError } = await supabase.auth.updateUser({
-      password: changeNewPassword,
-    });
-
-    setChangingPassword(false);
-
-    if (updateError) {
-      setChangePasswordMsg(updateError.message);
-      return;
-    }
-
-    setChangeCurrentPassword("");
-    setChangeNewPassword("");
-    setChangeConfirmPassword("");
-    setChangePasswordMsg("Password updated successfully.");
+    window.location.replace("/");
   }
 
   async function redownload(resourceId: string) {
     setMsg("");
     setDownloadingId(resourceId);
-
     const res = await fetch(`/api/download/${resourceId}`);
-    const json = await res.json();
-
+    const json = await res.json().catch(() => ({}));
     setDownloadingId(null);
 
-    if (!res.ok) {
-      setMsg(json.error || "Could not start download");
-      return;
+    if (!res.ok) return setMsg(json.error || "Could not start download");
+    if (!window.open(json.url, "_blank", "noopener,noreferrer")) {
+      setMsg("Your browser blocked the new tab. Allow pop-ups and try again.");
     }
-
-    const newTab = window.open(json.url, "_blank", "noopener,noreferrer");
-    if (!newTab) {
-      setMsg("Could not open a new tab. Please allow popups and try again.");
-      return;
-    }
-
-    setMsg("Opened your file in a new tab.");
   }
 
-  // NOT LOGGED IN
-  if (!user) {
+  if (!ready) {
     return (
-      <main className="max-w-md mx-auto p-8">
-
-        <div className="
-          rounded-3xl p-6
-          bg-gradient-to-br from-blue-50 via-white to-pink-50
-          dark:from-zinc-900 dark:to-zinc-800
-          border border-zinc-200 dark:border-zinc-800
-        ">
-          <h1 className="text-3xl font-semibold">
-            {authMode === "login" ? "Welcome back" : "Create your account"}
-          </h1>
-
-          <p className="text-sm text-zinc-500 mt-1">
-            {authMode === "login"
-              ? "Login with your email and password."
-              : "Sign up to start uploading and downloading resources."}
-          </p>
-
-          <input
-            type="email"
-            placeholder="student@udst.edu.qa"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="
-              mt-4 w-full px-4 py-3 rounded-2xl
-              border border-zinc-200
-              bg-white
-              dark:bg-zinc-900 dark:border-zinc-700
-              outline-none
-              focus:ring-2 focus:ring-blue-200
-            "
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="
-              mt-3 w-full px-4 py-3 rounded-2xl
-              border border-zinc-200
-              bg-white
-              dark:bg-zinc-900 dark:border-zinc-700
-              outline-none
-              focus:ring-2 focus:ring-blue-200
-            "
-          />
-
-          <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-1 bg-white dark:bg-zinc-900">
-            <button
-              onClick={() => {
-                setMsg("");
-                setAuthMode("login");
-              }}
-              className={`py-2 rounded-xl text-sm font-medium transition ${
-                authMode === "login"
-                  ? "bg-black text-white dark:bg-white dark:text-black"
-                  : "text-zinc-600 dark:text-zinc-300"
-              }`}
-            >
-              Login
-            </button>
-
-            <button
-              onClick={() => {
-                setMsg("");
-                setAuthMode("signup");
-              }}
-              className={`py-2 rounded-xl text-sm font-medium transition ${
-                authMode === "signup"
-                  ? "bg-black text-white dark:bg-white dark:text-black"
-                  : "text-zinc-600 dark:text-zinc-300"
-              }`}
-            >
-              Sign up
-            </button>
-          </div>
-
-          <div className="mt-3 grid grid-cols-1 gap-2">
-            <button
-              onClick={authMode === "login" ? login : signup}
-              disabled={sending}
-              className="
-                py-3 rounded-2xl
-                bg-black text-white
-                dark:bg-white dark:text-black
-                font-medium
-                hover:scale-[1.01] transition
-                disabled:opacity-50
-              "
-            >
-              {sending ? "Working..." : authMode === "login" ? "Login" : "Sign up"}
-            </button>
-          </div>
-
-          {authMode === "login" && (
-            <button
-              onClick={resetPassword}
-              disabled={sending}
-              className="
-                mt-3 text-sm underline underline-offset-4
-                text-zinc-600 dark:text-zinc-300
-                disabled:opacity-50
-              "
-            >
-              {sending ? "Working..." : "Reset password"}
-            </button>
-          )}
-
-          {msg && (
-            <p className="text-sm mt-4 text-zinc-500">
-              {msg}
-            </p>
-          )}
-        </div>
-
+      <main className="page-narrow">
+        <div className="card-hero h-40 animate-pulse" />
       </main>
     );
   }
 
-  // LOGGED IN
+  if (!user) return <AuthCard />;
+
+  const approved = uploads.filter((u) => u.status === "approved").length;
+
   return (
-    <main className="max-w-3xl mx-auto p-8 space-y-6">
-
-      {/* Profile Card */}
-      <div className="
-        rounded-3xl p-6
-        bg-gradient-to-br from-blue-50 via-white to-pink-50
-        dark:from-zinc-900 dark:to-zinc-800
-        border border-zinc-200 dark:border-zinc-800
-      ">
-        <h1 className="text-3xl font-semibold">
-          Profile
-        </h1>
-
-        <p className="text-zinc-500 mt-1">
-          {email}
-        </p>
-
-        <div className="mt-4 font-medium">
-          Credits: {credits}
-        </div>
-
-        <button
-          onClick={logout}
-          className="
-            mt-4 px-4 py-2 rounded-xl
-            border border-zinc-300 dark:border-zinc-700
-          "
-        >
-          Logout
-        </button>
-
-        <div className="mt-6 rounded-2xl border border-zinc-200 dark:border-zinc-700 p-4 bg-white/70 dark:bg-zinc-900/70">
-          <h2 className="text-lg font-semibold">Change password</h2>
-          <p className="text-xs text-zinc-500 mt-1">Update your password while signed in.</p>
-
-          <input
-            type="password"
-            placeholder="Current password"
-            value={changeCurrentPassword}
-            onChange={(e) => setChangeCurrentPassword(e.target.value)}
-            className="
-              mt-4 w-full px-4 py-3 rounded-2xl
-              border border-zinc-200
-              bg-white
-              dark:bg-zinc-900 dark:border-zinc-700
-              outline-none
-              focus:ring-2 focus:ring-blue-200
-            "
-          />
-
-          <input
-            type="password"
-            placeholder="New password"
-            value={changeNewPassword}
-            onChange={(e) => setChangeNewPassword(e.target.value)}
-            className="
-              mt-3 w-full px-4 py-3 rounded-2xl
-              border border-zinc-200
-              bg-white
-              dark:bg-zinc-900 dark:border-zinc-700
-              outline-none
-              focus:ring-2 focus:ring-blue-200
-            "
-          />
-
-          <input
-            type="password"
-            placeholder="Confirm new password"
-            value={changeConfirmPassword}
-            onChange={(e) => setChangeConfirmPassword(e.target.value)}
-            className="
-              mt-3 w-full px-4 py-3 rounded-2xl
-              border border-zinc-200
-              bg-white
-              dark:bg-zinc-900 dark:border-zinc-700
-              outline-none
-              focus:ring-2 focus:ring-blue-200
-            "
-          />
-
-          <button
-            onClick={changePassword}
-            disabled={changingPassword}
-            className="
-              mt-4 px-4 py-2 rounded-xl
-              bg-black text-white
-              dark:bg-white dark:text-black
-              font-medium
-              disabled:opacity-50
-            "
-          >
-            {changingPassword ? "Updating..." : "Update password"}
+    <main className="page-narrow">
+      <section className="card-hero">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="h1">Profile</h1>
+            <p className="mt-1 truncate muted">{user.email}</p>
+          </div>
+          <button type="button" onClick={logout} className="btn-secondary">
+            <LogOut size={14} /> Log out
           </button>
-
-          {changePasswordMsg && (
-            <p className="text-sm mt-3 text-zinc-500">{changePasswordMsg}</p>
-          )}
-        </div>
-      </div>
-
-
-      {/* Library tabs */}
-      <div className="space-y-4 rounded-3xl p-4 border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/70">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">My Library</h2>
-          <p className="text-xs text-zinc-500">Switch between uploads and downloaded files</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 rounded-2xl border border-zinc-200 dark:border-zinc-800 p-1 bg-white dark:bg-zinc-900">
-          <button
-            onClick={() => setActiveTab("uploads")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-              activeTab === "uploads"
-                ? "bg-black text-white dark:bg-white dark:text-black"
-                : "text-zinc-600 dark:text-zinc-300"
-            }`}
-          >
-            My Uploads ({uploads.length})
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          {[
+            { label: "Credits", value: credits },
+            { label: "Approved uploads", value: approved },
+            { label: "Downloads", value: purchases.length },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-2xl bg-white/70 p-3 dark:bg-zinc-900/60">
+              <div className="text-2xl font-semibold">{stat.value}</div>
+              <div className="text-xs muted">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <Link href="/credits" className="btn-primary mt-4">
+          <Coins size={14} /> Top up credits
+        </Link>
+      </section>
+
+      <section className="card space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="h2">My library</h2>
+        </div>
+
+        <div className="segmented">
+          <button type="button" onClick={() => setTab("uploads")} className={cn("segment", tab === "uploads" && "segment-active")}>
+            My uploads ({uploads.length})
           </button>
-
-          <button
-            onClick={() => setActiveTab("downloaded")}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition ${
-              activeTab === "downloaded"
-                ? "bg-black text-white dark:bg-white dark:text-black"
-                : "text-zinc-600 dark:text-zinc-300"
-            }`}
-          >
+          <button type="button" onClick={() => setTab("downloaded")} className={cn("segment", tab === "downloaded" && "segment-active")}>
             Downloaded ({purchases.length})
           </button>
         </div>
 
-        {activeTab === "downloaded" ? (
-          <div className="space-y-3">
-            {purchases.map((purchase) => (
-              <div
-                key={purchase.id}
-                className="
-                  rounded-2xl p-4
-                  border border-zinc-200 dark:border-zinc-800
-                  bg-white dark:bg-zinc-900
-                "
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium">{purchase.resources?.title ?? "Resource"}</p>
+        {msg && <p className="notice-error">{msg}</p>}
 
-                    <p className="text-xs text-zinc-500 mt-1">
-                      {purchase.resources?.type ?? "Unknown type"} • Bought {new Date(purchase.created_at).toLocaleDateString()}
+        {tab === "downloaded" ? (
+          purchases.length === 0 ? (
+            <p className="text-sm muted">
+              Nothing downloaded yet. <Link href="/resources" className="underline underline-offset-4">Browse resources →</Link>
+            </p>
+          ) : (
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+              {purchases.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{p.resource?.title ?? "Deleted resource"}</p>
+                    <p className="text-xs muted">
+                      {p.resource?.type ?? "—"} · {new Date(p.created_at).toLocaleDateString("en-GB")}
                     </p>
                   </div>
-
-                  <button
-                    onClick={() => purchase.resources?.id && redownload(purchase.resources.id)}
-                    disabled={!purchase.resources?.id || downloadingId === purchase.resources.id}
-                    className="
-                      shrink-0 px-4 py-2 rounded-xl text-sm
-                      bg-black text-white dark:bg-white dark:text-black
-                      disabled:opacity-50
-                    "
-                  >
-                    {downloadingId === purchase.resources?.id ? "Opening..." : "Download again"}
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {purchases.length === 0 && (
-              <p className="text-zinc-500">No downloaded resources yet.</p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {uploads.map((u) => {
-              const statusStyles = {
-                approved: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40",
-                pending: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40",
-                rejected: "bg-red-100 text-red-700 dark:bg-red-900/40",
-              };
-
-              return (
-                <div
-                  key={u.id}
-                  className="
-                    rounded-2xl p-4
-                    border border-zinc-200 dark:border-zinc-800
-                    bg-white dark:bg-zinc-900
-                  "
-                >
-                  <div className="flex justify-between">
-                    <p className="font-medium">{u.title}</p>
-
-                    <div
-                      className={`
-                        px-3 py-1 rounded-full text-xs font-medium
-                        ${statusStyles[u.status as keyof typeof statusStyles]}
-                      `}
+                  {p.resource && (
+                    <button
+                      type="button"
+                      onClick={() => redownload(p.resource!.id)}
+                      disabled={downloadingId === p.resource.id}
+                      className="btn-secondary shrink-0"
                     >
-                      {u.status}
-                    </div>
-                  </div>
-
-                  {u.status === "rejected" && u.rejected_reason && (
-                    <p className="text-xs text-red-500 mt-2">Reason: {u.rejected_reason}</p>
+                      <Download size={14} />
+                      {downloadingId === p.resource.id ? "Opening…" : "Download"}
+                    </button>
                   )}
+                </li>
+              ))}
+            </ul>
+          )
+        ) : uploads.length === 0 ? (
+          <p className="text-sm muted">
+            No uploads yet. <Link href="/upload" className="underline underline-offset-4">Upload your first resource →</Link>
+          </p>
+        ) : (
+          <ul className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {uploads.map((u) => (
+              <li key={u.id} className="py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="min-w-0 truncate font-medium">{u.title}</p>
+                  <span className={cn("shrink-0 capitalize", STATUS_BADGE[u.status] ?? "badge-neutral")}>{u.status}</span>
                 </div>
-              );
-            })}
-
-            {uploads.length === 0 && <p className="text-zinc-500">No uploads yet.</p>}
-          </div>
+                {u.status === "rejected" && u.rejected_reason && (
+                  <p className="mt-1 text-xs text-rose-500">Reason: {u.rejected_reason}</p>
+                )}
+              </li>
+            ))}
+          </ul>
         )}
-      </div>
+      </section>
 
-
+      <ChangePassword email={user.email ?? ""} />
     </main>
   );
 }

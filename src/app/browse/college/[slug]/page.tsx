@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ChevronRight } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
 
 export default async function CollegeMajorsPage({
@@ -6,71 +8,51 @@ export default async function CollegeMajorsPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  // ✅ Next 16 requires awaiting params
   const { slug } = await params;
-
   const supabase = await supabaseServer();
 
-  // Get the college
-  const { data: college, error: collegeError } = await supabase
+  const { data: college, error } = await supabase
     .from("colleges")
-    .select("id, name, institution_id, slug")
+    .select("id, name")
     .eq("slug", slug)
-    .maybeSingle(); // safer than .single()
+    .maybeSingle();
 
-  if (collegeError) {
-    return <main className="p-6">Error: {collegeError.message}</main>;
+  if (error) {
+    return <main className="page-narrow"><p className="notice-error">{error.message}</p></main>;
   }
+  if (!college) notFound();
 
-  if (!college) {
-    return <main className="p-6">College not found.</main>;
-  }
-
-  // Get majors inside this college
   const { data: majors, error: majorsError } = await supabase
     .from("majors")
     .select("id, name")
     .eq("college_id", college.id)
     .order("name");
 
-  if (majorsError) {
-    return <main className="p-6">Error: {majorsError.message}</main>;
-  }
-
   return (
-    <main className="max-w-2xl mx-auto p-6 space-y-4">
-      <div className="flex items-center justify-between">
+    <main className="page-narrow">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">{college.name}</h1>
-          <p className="text-zinc-500">Majors</p>
+          <h1 className="h1">{college.name}</h1>
+          <p className="muted">Choose a major</p>
         </div>
-
-        <Link
-          href="/browse"
-          className="text-sm px-3 py-2 rounded-full border border-zinc-200 dark:border-zinc-700"
-        >
-          Back
+        <Link href="/browse" className="btn-secondary">
+          <ArrowLeft size={14} /> Back
         </Link>
       </div>
 
-      <div className="space-y-3">
-        {majors?.map((m) => (
-          <Link
-            key={m.id}
-            href={`/browse/major/${m.id}`}
-            className="
-              block p-5 rounded-3xl border border-zinc-200 bg-white shadow-sm
-              hover:shadow-md transition
-              dark:bg-zinc-900 dark:border-zinc-800
-            "
-          >
-            <div className="text-lg font-semibold">{m.name}</div>
-          </Link>
-        ))}
-      </div>
+      {majorsError && <p className="notice-error">{majorsError.message}</p>}
 
-      {(!majors || majors.length === 0) && (
-        <p className="text-zinc-500">No majors found.</p>
+      {!majors?.length ? (
+        <p className="card text-sm muted">No majors found.</p>
+      ) : (
+        <div className="space-y-2">
+          {majors.map((m) => (
+            <Link key={m.id} href={`/browse/major/${m.id}`} className="card card-hover flex items-center justify-between gap-4 py-4">
+              <span className="font-semibold">{m.name}</span>
+              <ChevronRight size={18} className="shrink-0 text-zinc-400" />
+            </Link>
+          ))}
+        </div>
       )}
     </main>
   );

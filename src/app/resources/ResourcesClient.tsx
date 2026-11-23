@@ -1,288 +1,291 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { Download, FileText, Loader2, Search, Trash2, X } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { one } from "@/lib/format";
+import { plural } from "@/lib/credits";
 
 type SortKey = "newest" | "cheapest" | "expensive";
 
-type ResourceItem = {
+type Course = { id: string; code: string; name: string };
+
+type ResourceRow = {
   id: string;
   title: string;
   type: string;
   cost: number;
   page_count: number | null;
   created_at: string;
-  course_id: string | null;
-  courses: { id: string; code: string; name: string } | null;
+  courses: Course | Course[] | null;
 };
 
-export default function ResourcesPage() {
+type ResourceItem = Omit<ResourceRow, "courses"> & { course: Course | null };
+
+type Notice = { kind: "info" | "error" | "credits"; text: string } | null;
+
+const TYPES = ["Past Paper", "Notes", "Assignment", "Lab", "Cheat Sheet", "Summary", "Other"];
+
+const SORTS: Record<SortKey, { column: "created_at" | "cost"; ascending: boolean }> = {
+  newest: { column: "created_at", ascending: false },
+  cheapest: { column: "cost", ascending: true },
+  expensive: { column: "cost", ascending: false },
+};
+
+/** Escape LIKE wildcards so a search for "100%" matches literally. */
+function likePattern(q: string) {
+  return `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+export default function ResourcesClient() {
   const supabase = useMemo(() => supabaseBrowser(), []);
   const searchParams = useSearchParams();
 
-  const [msg, setMsg] = useState("");
   const [credits, setCredits] = useState<number | null>(null);
   const [isMod, setIsMod] = useState(false);
-
-  const [type, setType] = useState<string>("all");
+  const [type, setType] = useState("all");
   const [sort, setSort] = useState<SortKey>("newest");
-  const [q, setQ] = useState<string>(searchParams.get("q") ?? "");
-
+  const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [items, setItems] = useState<ResourceItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<Notice>(null);
 
-  // Load credits
-  useEffect(() => {
-    (async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) {
-        setCredits(null);
-        return;
-      }
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("credits,role")
-        .eq("id", u.user.id)
-        .single();
-
-      setCredits(profile?.credits ?? 0);
-      setIsMod(profile?.role === "mod" || profile?.role === "admin");
-    })();
-  }, [supabase]);
-
-  async function deleteResource(resourceId: string) {
-    const ok = confirm("Delete this resource and file? This cannot be undone.");
-    if (!ok) return;
-
-    setMsg("");
-    setDeletingId(resourceId);
-
-    try {
-      const res = await fetch(`/api/mod/resource/${resourceId}`, { method: "DELETE" });
-      const json = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setMsg(json?.error || "Failed to delete resource");
-        return;
-      }
-
-      setMsg("Resource deleted 🗑️");
-      setItems((prev) => prev.filter((item) => item.id !== resourceId));
-    } finally {
-      setDeletingId(null);
+  const loadProfile = useCallback(async () => {
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      setCredits(null);
+      return;
     }
-  }
-
-  async function load() {
-    setLoading(true);
-    setMsg("");
-
-    let query = supabase
-      .from("resources")
-      .select(
-        `
-        id,title,type,cost,page_count,created_at,course_id,
-        courses ( id, code, name )
-      `
-      )
-      .eq("status", "approved")
-      .order("created_at", { ascending: false });
-
-    if (type !== "all") query = query.eq("type", type);
-
-    const trimmed = q.trim();
-    if (trimmed) {
-      query = query.ilike("title", `%${trimmed}%`);
-    }
-
-    if (sort === "newest") query = query.order("created_at", { ascending: false });
-    if (sort === "cheapest") query = query.order("cost", { ascending: true });
-    if (sort === "expensive") query = query.order("cost", { ascending: false });
-
-    const { data, error } = await query.limit(100);
-
-    if (error) setMsg(error.message);
-    setItems((data ?? []) as ResourceItem[]);
-    setLoading(false);
-  }
-
-  // Auto-load on filter/search changes
-  useEffect(() => {
-    const t = setTimeout(() => load(), 250);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, sort, q]);
-
-  async function refreshCredits() {
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return setCredits(null);
     const { data: profile } = await supabase
       .from("profiles")
-      .select("credits")
-      .eq("id", u.user.id)
-      .single();
-    setCredits(profile?.credits ?? credits ?? 0);
+      .select("credits, role")
+      .eq("id", auth.user.id)
+      .maybeSingle();
+    setCredits(profile?.credits ?? 0);
+    setIsMod(profile?.role === "mod" || profile?.role === "admin");
+  }, [supabase]);
+
+  useEffect(() => {
+    void loadProfile();
+  }, [loadProfile]);
+
+  // Debounced search / filter
+  useEffect(() => {
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      const { column, ascending } = SORTS[sort];
+
+      let query = supabase
+        .from("resources")
+        .select("id, title, type, cost, page_count, created_at, courses ( id, code, name )")
+        .eq("status", "approved");
+
+      if (type !== "all") query = query.eq("type", type);
+      if (q.trim()) query = query.ilike("title", likePattern(q.trim()));
+
+      const { data, error } = await query
+        .order(column, { ascending })
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+      if (cancelled) return;
+      if (error) setNotice({ kind: "error", text: error.message });
+      setItems(((data ?? []) as ResourceRow[]).map(({ courses, ...r }) => ({ ...r, course: one(courses) })));
+      setLoading(false);
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [supabase, type, sort, q]);
+
+  async function openDownload(resourceId: string) {
+    const res = await fetch(`/api/download/${resourceId}`);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || "Could not start download");
+
+    if (!window.open(json.url, "_blank", "noopener,noreferrer")) {
+      setNotice({ kind: "info", text: "Your browser blocked the new tab — allow pop-ups and use Profile → Downloaded." });
+      return;
+    }
+    setNotice({ kind: "info", text: "Download started in a new tab." });
   }
 
-  async function download(resourceId: string) {
-    setMsg("");
+  async function download(item: ResourceItem) {
+    setNotice(null);
 
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) return setMsg("Login first at /profile");
-
-    const { error } = await supabase.rpc("spend_credits_and_log_download", {
-      p_resource_id: resourceId,
-    });
-    if (error) return setMsg(error.message);
-
-    await refreshCredits();
-
-    const res = await fetch(`/api/download/${resourceId}`);
-    const json = await res.json();
-    if (!res.ok) return setMsg(json.error || "Could not start download");
-
-    const newTab = window.open(json.url, "_blank", "noopener,noreferrer");
-    if (!newTab) {
-      setMsg("Download started, but your browser blocked opening a new tab.");
+    if (credits === null) {
+      setNotice({ kind: "error", text: "Please log in on the Profile page to download." });
       return;
     }
 
-    setMsg("Starting download in a new tab…");
+    setBusyId(item.id);
+    try {
+      const { error } = await supabase.rpc("spend_credits_and_log_download", {
+        p_resource_id: item.id,
+      });
+
+      if (error) {
+        const message = error.message;
+        if (message.includes("Insufficient credits")) {
+          setNotice({ kind: "credits", text: `You need ${plural(item.cost, "credit")} for this file.` });
+          return;
+        }
+        // Already paid → just hand out the file again.
+        if (!message.includes("Already downloaded")) {
+          setNotice({ kind: "error", text: message.replace(/^.*failed: /, "") });
+          return;
+        }
+      }
+
+      await loadProfile();
+      await openDownload(item.id);
+    } catch (e) {
+      setNotice({ kind: "error", text: e instanceof Error ? e.message : "Download failed" });
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function deleteResource(resourceId: string) {
+    if (!confirm("Delete this resource and its file? This cannot be undone.")) return;
+
+    setNotice(null);
+    setBusyId(resourceId);
+    try {
+      const res = await fetch(`/api/mod/resource/${resourceId}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setNotice({ kind: "error", text: json?.error || "Failed to delete resource" });
+        return;
+      }
+      setItems((prev) => prev.filter((item) => item.id !== resourceId));
+      setNotice({ kind: "info", text: "Resource deleted." });
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-5">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+    <main className="page">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-semibold">Resources</h1>
-          <p className="text-zinc-500">Search and download approved uploads</p>
+          <h1 className="h1">Resources</h1>
+          <p className="muted">Search and download approved uploads</p>
         </div>
 
-        <div
-          className="
-            rounded-3xl p-4 border border-zinc-200 bg-white shadow-sm
-            dark:bg-zinc-900 dark:border-zinc-800
-          "
-        >
-          <div className="text-sm text-zinc-500">Your credits</div>
+        <Link href={credits === null ? "/profile" : "/credits"} className="card card-hover px-5 py-3">
+          <div className="text-xs muted">Your credits</div>
           <div className="text-2xl font-semibold">{credits ?? "Sign in"}</div>
-        </div>
+        </Link>
       </div>
 
       {/* Search + filters */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-        <div
-          className="
-            md:col-span-2 flex items-center gap-2 rounded-2xl border border-zinc-200
-            bg-white px-3 py-2 shadow-sm
-            dark:bg-zinc-900 dark:border-zinc-800
-          "
-        >
-          <span className="text-zinc-400">⌕</span>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <label className="input flex items-center gap-2 md:col-span-2">
+          <Search size={16} className="shrink-0 text-zinc-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search title…"
-            className="w-full bg-transparent outline-none text-sm"
+            placeholder="Search by title…"
+            aria-label="Search by title"
+            className="w-full bg-transparent outline-none"
           />
           {q && (
-            <button
-              onClick={() => setQ("")}
-              className="text-xs px-2 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 transition dark:bg-zinc-800 dark:hover:bg-zinc-700"
-            >
-              Clear
+            <button type="button" onClick={() => setQ("")} aria-label="Clear search" className="text-zinc-400 hover:text-zinc-600">
+              <X size={16} />
             </button>
           )}
-        </div>
+        </label>
 
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          className="
-            rounded-2xl border border-zinc-200 bg-white px-3 py-2 shadow-sm text-sm
-            dark:bg-zinc-900 dark:border-zinc-800
-          "
-        >
+        <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Filter by type">
           <option value="all">All types</option>
-          <option value="Past Paper">Past Paper</option>
-          <option value="Notes">Notes</option>
-          <option value="Assignment">Assignment</option>
-          <option value="Lab">Lab</option>
-          <option value="Other">Other</option>
+          {TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
         </select>
 
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortKey)}
-          className="
-            rounded-2xl border border-zinc-200 bg-white px-3 py-2 shadow-sm text-sm
-            dark:bg-zinc-900 dark:border-zinc-800
-          "
-        >
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort">
           <option value="newest">Newest</option>
           <option value="cheapest">Cheapest</option>
           <option value="expensive">Most expensive</option>
         </select>
       </div>
 
-      {msg && <p className="text-sm text-zinc-600 dark:text-zinc-300">{msg}</p>}
-      {loading && <p className="text-sm text-zinc-500">Loading…</p>}
+      {notice && (
+        <div className={notice.kind === "error" ? "notice-error" : "notice"}>
+          {notice.text}
+          {notice.kind === "credits" && (
+            <>
+              {" "}
+              <Link href="/credits" className="font-semibold underline underline-offset-4">
+                Top up credits →
+              </Link>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Results */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {items.map((r) => (
-          <div
-            key={r.id}
-            className="
-              rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm
-              dark:bg-zinc-900 dark:border-zinc-800
-            "
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="font-semibold truncate">{r.title}</div>
-                <div className="text-sm text-zinc-500 truncate">
-                  {r.courses?.code ? `${r.courses.code} • ${r.courses.name}` : "Course"} • {r.type}
+      {loading ? (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card h-[92px] animate-pulse" />
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <p className="card text-sm muted">No matches. Try a different search or filter.</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {items.map((r) => (
+            <div key={r.id} className="card flex items-start gap-3 p-4">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                <FileText size={18} />
+              </span>
+
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-semibold">{r.title}</div>
+                <div className="truncate text-sm muted">
+                  {r.course ? `${r.course.code} · ${r.course.name}` : "General"} · {r.type}
                 </div>
-                <div className="text-xs text-zinc-400 mt-1">
-                  {typeof r.page_count === "number" ? `${r.page_count} pages • ` : ""}
-                  cost {r.cost}
+                <div className="mt-1 text-xs text-zinc-400">
+                  {typeof r.page_count === "number" ? `${plural(r.page_count, "page")} · ` : ""}
+                  {plural(r.cost, "credit")}
                 </div>
               </div>
 
-              <button
-                onClick={() => download(r.id)}
-                className="
-                  shrink-0 px-4 py-2 rounded-2xl bg-black text-white text-sm
-                  hover:opacity-90 transition
-                  dark:bg-white dark:text-black
-                "
-              >
-                Download
-              </button>
-
-              {isMod && (
+              <div className="flex shrink-0 flex-col gap-2">
                 <button
-                  onClick={() => deleteResource(r.id)}
-                  disabled={deletingId === r.id}
-                  className="
-                    shrink-0 px-4 py-2 rounded-2xl border border-rose-300 text-rose-600 text-sm
-                    hover:bg-rose-50 disabled:opacity-60 disabled:cursor-not-allowed
-                    dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/30
-                  "
+                  type="button"
+                  onClick={() => download(r)}
+                  disabled={busyId === r.id}
+                  className="btn-primary"
                 >
-                  {deletingId === r.id ? "Deleting…" : "Delete"}
+                  {busyId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Get
                 </button>
-              )}
+                {isMod && (
+                  <button
+                    type="button"
+                    onClick={() => deleteResource(r.id)}
+                    disabled={busyId === r.id}
+                    className="btn-danger"
+                    aria-label={`Delete ${r.title}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {!loading && items.length === 0 && (
-        <p className="text-sm text-zinc-500">No matches. Try changing filters.</p>
+          ))}
+        </div>
       )}
     </main>
   );

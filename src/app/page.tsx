@@ -1,259 +1,133 @@
 import Link from "next/link";
+import { ArrowRight, Coins, FileText, Upload } from "lucide-react";
 import HomeSearch from "./_components/HomeSearch";
 import { supabaseServer } from "@/lib/supabase/server";
+import { one, timeAgo } from "@/lib/format";
+import { plural } from "@/lib/credits";
 
-type LatestResource = {
+type Course = { code: string; name: string };
+
+type LatestRow = {
   id: string;
   title: string;
   type: string;
   cost: number;
   page_count: number | null;
   created_at: string;
-  courses: { code: string; name: string } | null;
+  courses: Course | Course[] | null;
 };
-
-function timeAgo(iso: string) {
-  const d = new Date(iso).getTime();
-  const now = Date.now();
-  const s = Math.max(1, Math.floor((now - d) / 1000));
-
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 48) return `${h}h ago`;
-
-  const days = Math.floor(h / 24);
-  return `${days}d ago`;
-}
 
 export default async function HomePage() {
   const supabase = await supabaseServer();
+  const { data: auth } = await supabase.auth.getUser();
+  const user = auth.user ?? null;
 
-  const { data: u } = await supabase.auth.getUser();
-  const user = u.user ?? null;
+  const [profileRes, latestRes] = await Promise.all([
+    user
+      ? supabase.from("profiles").select("credits").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("resources")
+      .select("id, title, type, cost, page_count, created_at, courses ( code, name )")
+      .eq("status", "approved")
+      .order("created_at", { ascending: false })
+      .limit(12),
+  ]);
 
-  let credits: number | null = null;
-
-  if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("credits")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    credits = profile?.credits ?? 0;
-  }
-
-  const { data: latest } = await supabase
-    .from("resources")
-    .select(
-      `
-      id,
-      title,
-      type,
-      cost,
-      page_count,
-      created_at,
-      courses (
-        code,
-        name
-      )
-    `
-    )
-    .eq("status", "approved")
-    .order("created_at", { ascending: false })
-    .limit(12);
-
-  const latestRows: LatestResource[] = ((latest ?? []) as Array<{
-    id: string;
-    title: string;
-    type: string;
-    cost: number;
-    page_count: number | null;
-    created_at: string;
-    courses: { code: string; name: string } | { code: string; name: string }[] | null;
-  }>)
-    .map((row) => ({
-      ...row,
-      courses: Array.isArray(row.courses) ? (row.courses[0] ?? null) : row.courses,
-    }));
+  const credits = user ? (profileRes.data?.credits ?? 0) : null;
+  const latest = ((latestRes.data ?? []) as LatestRow[]).map((r) => ({
+    ...r,
+    course: one(r.courses),
+  }));
 
   return (
-    <main className="max-w-5xl mx-auto p-6 space-y-6">
-      
-      {/* HERO */}
-      <section
-        className="
-          relative overflow-hidden backdrop-blur-xl
-          rounded-[32px] p-6 md:p-8
-          border border-zinc-200
-          shadow-sm
-
-          bg-gradient-to-br 
-          from-pink-100/70 
-          via-blue-100/60 
-          to-purple-100/70
-
-          dark:from-zinc-900
-          dark:via-zinc-900
-          dark:to-zinc-800
-        "
-      >
-        {/* Glass glow overlay */}
+    <main className="page">
+      {/* Hero */}
+      <section className="relative overflow-hidden rounded-[32px] border border-zinc-200/80 bg-gradient-to-br from-pink-100/70 via-blue-100/60 to-purple-100/70 p-6 shadow-sm md:p-8 dark:border-zinc-800 dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800">
         <div
-          className="
-            pointer-events-none
-            absolute inset-0
-            bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.6),transparent_40%),
-                radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.5),transparent_40%)]
-          "
+          aria-hidden
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.6),transparent_40%),radial-gradient(circle_at_80%_30%,rgba(255,255,255,0.5),transparent_40%)] dark:opacity-10"
         />
 
-        <div className="relative flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          
-          {/* LEFT */}
-          <div className="space-y-2">
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
+        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-xl space-y-3">
+            <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
               Share smarter. Study faster.
             </h1>
-
-            <p className="text-zinc-600 dark:text-zinc-300 max-w-xl">
-              Past papers, notes, assignments — organized by college, major, and course.
+            <p className="prose-body">
+              Past papers, notes and assignments — organised by college, major and course.
             </p>
-
-            <div className="mt-4 max-w-md">
+            <div className="pt-2">
               <HomeSearch />
             </div>
           </div>
 
-          {/* RIGHT — Credits card */}
-          <div
-            className="
-              shrink-0 w-full md:w-[280px]
-              rounded-3xl p-4
-              bg-white/70 backdrop-blur-xl
-              border border-white/40
-              shadow-sm
-
-              dark:bg-zinc-900/70
-              dark:border-zinc-800
-            "
-          >
-            <div className="text-sm text-zinc-500">
-              Your credits
+          <div className="card w-full shrink-0 md:w-[260px]">
+            <div className="flex items-center gap-2 text-sm muted">
+              <Coins size={16} /> Your credits
             </div>
-
-            <div className="text-2xl font-semibold mt-1">
-              {user ? credits : "Sign in"}
-            </div>
-
-            <div className="mt-3 flex gap-2">
-              <Link
-                href="/profile"
-                className="
-                  px-4 py-2 rounded-2xl
-                  bg-black text-white text-sm
-                  hover:opacity-90 transition
-                  dark:bg-white dark:text-black
-                "
-              >
-                {user ? "Profile" : "Sign in"}
-              </Link>
-
-              <Link
-                href="/upload"
-                className="
-                  px-4 py-2 rounded-2xl
-                  border border-zinc-200 text-sm
-                  hover:bg-zinc-50 transition
-                  dark:border-zinc-800 dark:hover:bg-zinc-900
-                "
-              >
-                Upload
-              </Link>
+            <div className="mt-1 text-3xl font-semibold">{credits ?? "—"}</div>
+            <div className="mt-4 flex gap-2">
+              {user ? (
+                <>
+                  <Link href="/credits" className="btn-primary flex-1">
+                    Top up
+                  </Link>
+                  <Link href="/upload" className="btn-secondary flex-1">
+                    <Upload size={14} /> Upload
+                  </Link>
+                </>
+              ) : (
+                <Link href="/profile" className="btn-primary w-full">
+                  Sign in to start
+                </Link>
+              )}
             </div>
           </div>
-
         </div>
       </section>
 
-      {/* LATEST */}
+      {/* Latest */}
       <section className="space-y-3">
         <div className="flex items-end justify-between">
           <div>
-            <h2 className="text-xl font-semibold">
-              Latest uploads
-            </h2>
-            <p className="text-zinc-500 text-sm">
-              Newly approved resources
-            </p>
+            <h2 className="h2">Latest uploads</h2>
+            <p className="text-sm muted">Newly approved resources</p>
           </div>
-
-          <Link
-            href="/resources"
-            className="
-              text-sm text-zinc-600
-              hover:text-zinc-900
-              dark:text-zinc-300
-              dark:hover:text-white
-            "
-          >
-            View all →
+          <Link href="/resources" className="btn-ghost">
+            View all <ArrowRight size={14} />
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {latestRows.map((r) => (
-            <Link
-              key={r.id}
-              href="/resources"
-              className="
-                block rounded-3xl
-                border border-zinc-200
-                bg-white p-4 shadow-sm
-                hover:shadow-md transition
-
-                dark:bg-zinc-900
-                dark:border-zinc-800
-              "
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="font-semibold truncate">
-                    {r.title}
+        {latest.length === 0 ? (
+          <p className="card text-sm muted">No uploads yet — be the first!</p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            {latest.map((r) => (
+              <Link
+                key={r.id}
+                href={`/resources?q=${encodeURIComponent(r.title)}`}
+                className="card card-hover flex items-start gap-3 p-4"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+                  <FileText size={18} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold">{r.title}</div>
+                  <div className="truncate text-sm muted">
+                    {r.course ? `${r.course.code} · ${r.course.name}` : "General"} · {r.type}
                   </div>
-
-                  <div className="text-sm text-zinc-500 truncate">
-                    {r.courses?.code
-                      ? `${r.courses.code} • ${r.courses.name}`
-                      : "Course"}{" "}
-                    • {r.type}
-                  </div>
-
-                  <div className="text-xs text-zinc-400 mt-1">
-                    {r.created_at ? timeAgo(r.created_at) : ""}
-                    {typeof r.page_count === "number"
-                      ? ` • ${r.page_count} pages`
-                      : ""}
+                  <div className="mt-1 text-xs text-zinc-400">
+                    {timeAgo(r.created_at)}
+                    {typeof r.page_count === "number" ? ` · ${plural(r.page_count, "page")}` : ""}
                   </div>
                 </div>
-
-                <div className="text-sm font-semibold shrink-0">
-                  {r.cost} credits
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
-
-        {(latest ?? []).length === 0 && (
-          <p className="text-sm text-zinc-500">
-            No uploads yet.
-          </p>
+                <span className="badge-neutral shrink-0">{plural(r.cost, "credit")}</span>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
-
     </main>
   );
 }

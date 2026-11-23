@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { supabaseServer } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { PDFDocument } from "pdf-lib";
 import * as mammoth from "mammoth";
 
@@ -48,30 +48,9 @@ async function getPageCountFromBuffer(buf: Buffer, ext: string) {
 }
 
 export async function POST(req: NextRequest) {
-  const response = NextResponse.next();
+  const supabase = await supabaseServer();
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            response.cookies.set(name, value, options);
-          });
-        },
-      },
-    }
-  );
-
-  const admin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  const admin = supabaseAdmin();
 
   const { data: userData } = await supabase.auth.getUser();
   const user = userData.user;
@@ -158,6 +137,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true, id: inserted.id, page_count, cost });
 }
-
-// force TS to treat this file as a module (fixes "is not a module")
-export {};

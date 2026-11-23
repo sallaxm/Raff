@@ -1,4 +1,6 @@
+import { notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase/server";
+import { one } from "@/lib/format";
 import MajorCoursesClient from "./MajorCoursesClient";
 
 type ClientCourseRow = {
@@ -34,9 +36,7 @@ export default async function MajorPage({
     .eq("id", id)
     .maybeSingle();
 
-  if (!major) {
-    return <main className="p-6">Major not found.</main>;
-  }
+  if (!major) notFound();
 
   const { data, error } = await supabase
     .from("major_courses")
@@ -57,12 +57,12 @@ export default async function MajorPage({
     .order("semester");
 
   if (error) {
-    return <main className="p-6">Error: {error.message}</main>;
+    return <main className="page-narrow"><p className="notice-error">{error.message}</p></main>;
   }
 
   const rows: ClientCourseRow[] = ((data ?? []) as MajorCourseQueryRow[])
     .map((row) => {
-      const course = Array.isArray(row.courses) ? row.courses[0] : row.courses;
+      const course = one(row.courses);
       if (!course) return null;
 
       return {
@@ -74,6 +74,5 @@ export default async function MajorPage({
     })
     .filter((row): row is ClientCourseRow => row !== null);
 
-  // Pass to client for search/filtering
   return <MajorCoursesClient majorName={major.name} rows={rows} />;
 }

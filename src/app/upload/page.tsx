@@ -1,8 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PDFDocument } from "pdf-lib";
+import { UploadCloud } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
+import { downloadCost, FIRST_UPLOAD_BONUS, plural, uploadReward } from "@/lib/credits";
+import { cn } from "@/lib/format";
 
 type College = { id: string; name: string; institution_id: string };
 type Major = { id: string; name: string };
@@ -22,10 +26,6 @@ const categories = [
 const ACCEPT =
   ".pdf,.docx,.pptx,.xlsx,.txt,.md,.zip,.rar,.7z,.png,.jpg,.jpeg,.webp";
 
-
-type MammothModule = {
-  extractRawText: (input: { arrayBuffer: ArrayBuffer }) => Promise<{ value?: string }>;
-};
 
 type MajorCourseJoinRow = {
   courses: Course | null;
@@ -67,7 +67,7 @@ async function countDocxPages(file: File): Promise<number | null> {
     // Mammoth doesn't reliably give "pages" (Word pages are layout-dependent),
     // so we use a heuristic: estimate pages based on word count.
     // If you later want, we can move this to server for better parsing.
-    const mammoth = (await import("mammoth/mammoth.browser")) as unknown as MammothModule;
+    const mammoth = await import("mammoth/mammoth.browser");
 
     const buf = await file.arrayBuffer();
     const { value } = await mammoth.extractRawText({ arrayBuffer: buf });
@@ -116,9 +116,9 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
 
   const [detectedPages, setDetectedPages] = useState<number | null>(null);
-  const estimatedPageCount = file ? detectedPages ?? 1 : null;
-  const estimatedCredits =
-    estimatedPageCount == null ? null : Math.max(1, Math.ceil(estimatedPageCount / 5));
+  const estimate = file
+    ? { pages: detectedPages ?? 1, reward: uploadReward(downloadCost(detectedPages ?? 1)) }
+    : null;
   const [lastUploadEstimate, setLastUploadEstimate] = useState<LastUploadEstimate | null>(null);
 
   const selectedCollege = useMemo(
@@ -283,7 +283,7 @@ export default function UploadPage() {
 
       // Page count: use detected pages (pdf/docx) else null (mod can set later)
       const pageCount = detectedPages ?? 1; // ✅ never null (DB requires NOT NULL)
-      const cost = Math.max(1, Math.ceil(pageCount / 5));
+      const cost = downloadCost(pageCount); // DB trigger recomputes this too
 
       const payload: ResourceInsert = {
         institution_id: selectedCollege.institution_id,
@@ -310,8 +310,8 @@ export default function UploadPage() {
         return;
       }
 
-      setLastUploadEstimate({ credits: cost, pageCount });
-      setMsg("Uploaded ✅ Pending approval.");
+      setLastUploadEstimate({ credits: uploadReward(cost), pageCount });
+      setMsg("Uploaded! A moderator will review it soon — you’ll get credits once it’s approved.");
       setTitle("");
       setFile(null);
       setDetectedPages(null);
@@ -321,183 +321,145 @@ export default function UploadPage() {
   }
 
   return (
-    <main className="max-w-3xl mx-auto px-4 py-6 space-y-6 overflow-x-hidden">
-      {/* HEADER */}
-      <div
-        className="
-          rounded-3xl p-6
-          bg-gradient-to-br from-blue-50 via-white to-pink-50
-          dark:from-zinc-900 dark:via-zinc-900 dark:to-zinc-800
-          border border-zinc-200 dark:border-zinc-800
-        "
-      >
-        <h1 className="text-3xl font-semibold tracking-tight">Upload Resource</h1>
-        <p className="text-sm text-zinc-500 mt-1">
-          Earn credits when your upload is approved.
+    <main className="page-narrow">
+      <section className="card-hero">
+        <h1 className="h1">Upload a resource</h1>
+        <p className="mt-1 text-sm muted">
+          Share notes or past papers and earn credits once a moderator approves them.{" "}
+          <Link href="/guidelines" className="underline underline-offset-4">
+            Read the guidelines
+          </Link>
+          .
         </p>
-      </div>
+      </section>
 
-      {/* FORM */}
-      <div
-        className="
-          rounded-3xl p-6 space-y-5
-          bg-white/70 dark:bg-zinc-900/70
-          backdrop-blur-xl
-          border border-zinc-200 dark:border-zinc-800
-          min-w-0
-        "
-      >
-        {msg && (
-          <div className="text-sm px-4 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 break-words">
-            {msg}
+      <section className="card min-w-0 space-y-5">
+        {msg && <p className="notice">{msg}</p>}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="college">College</label>
+            <select id="college" value={collegeId} onChange={(e) => setCollegeId(e.target.value)}>
+              {colleges.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="label" htmlFor="major">Major</label>
+            <select id="major" value={majorId} onChange={(e) => setMajorId(e.target.value)}>
+              {majors.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <span className="label">Applies to</span>
+          <div className="segmented">
+            {(["course", "major"] as UploadMode[]).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setMode(m)}
+                className={cn("segment", mode === m && "segment-active")}
+              >
+                {m === "course" ? "A specific course" : "The whole major"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mode === "course" && (
+          <div>
+            <label className="label" htmlFor="course">Course</label>
+            <select id="course" value={courseId} onChange={(e) => setCourseId(e.target.value)}>
+              {courses.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.name}
+                </option>
+              ))}
+            </select>
           </div>
         )}
 
-        {/* College */}
-        <select
-          value={collegeId}
-          onChange={(e) => setCollegeId(e.target.value)}
-          className="input w-full min-w-0"
-        >
-          {colleges.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Major */}
-        <select
-          value={majorId}
-          onChange={(e) => setMajorId(e.target.value)}
-          className="input w-full min-w-0"
-        >
-          {majors.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
-
-        {/* Mode pills */}
-        <div className="flex flex-wrap gap-2">
-          {(["course", "major"] as UploadMode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className={`
-                px-4 py-2 rounded-full text-sm
-                border transition whitespace-nowrap
-                ${
-                  mode === m
-                    ? "bg-black text-white border-black dark:bg-white dark:text-black"
-                    : "border-zinc-300 dark:border-zinc-700"
-                }
-              `}
-            >
-              {m === "course" ? "Course Upload" : "General Major"}
-            </button>
-          ))}
-        </div>
-
-        {/* Course (ONLY show if course mode) */}
-        {mode === "course" && (
-          <select
-            value={courseId}
-            onChange={(e) => setCourseId(e.target.value)}
-            className="input w-full min-w-0"
-          >
-            {courses.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.code} — {c.name}
-              </option>
+        <div>
+          <span className="label">Type</span>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setType(cat)}
+                className={cn("pill", type === cat && "pill-active")}
+              >
+                {cat}
+              </button>
             ))}
-          </select>
-        )}
-
-        {/* CATEGORY PILLS */}
-        <div className="flex flex-wrap gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setType(cat)}
-              className={`
-                px-4 py-2 rounded-full text-sm
-                border transition whitespace-nowrap
-                ${
-                  type === cat
-                    ? "bg-black text-white border-black dark:bg-white dark:text-black"
-                    : "border-zinc-300 dark:border-zinc-700"
-                }
-              `}
-            >
-              {cat}
-            </button>
-          ))}
+          </div>
         </div>
 
-        <input
-          placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="input w-full min-w-0"
-        />
+        <div>
+          <label className="label" htmlFor="title">Title</label>
+          <input
+            id="title"
+            placeholder={file ? file.name : "e.g. MATH101 Midterm 2024"}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="input"
+          />
+        </div>
 
-        {/* Estimated reward (pages auto-detected when possible) */}
-        <div
-          className="
-            rounded-2xl px-4 py-3
-            bg-gradient-to-r from-blue-100 to-pink-100
-            dark:from-zinc-800 dark:to-zinc-700
-            text-sm font-medium
-            break-words
-          "
-        >
-          {estimatedCredits == null ? (
-            lastUploadEstimate ? (
-              <span>
-                Last uploaded reward: {lastUploadEstimate.credits} credits{" "}
-                <span className="opacity-70">
-                  • {lastUploadEstimate.pageCount} page{lastUploadEstimate.pageCount === 1 ? "" : "s"}
-                </span>
-              </span>
+        <div>
+          <span className="label">File</span>
+          <label
+            htmlFor="file"
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-zinc-200 px-4 py-8 text-center transition hover:border-blue-300 hover:bg-blue-50/40 dark:border-zinc-700 dark:hover:border-blue-800 dark:hover:bg-blue-950/20"
+          >
+            <UploadCloud size={24} className="text-zinc-400" />
+            {file ? (
+              <span className="max-w-full truncate text-sm font-medium">{file.name}</span>
             ) : (
-              <span>Estimated reward: <span className="opacity-70">Upload a file to see estimate</span></span>
-            )
-          ) : (
-            <span>
-              Estimated reward: {estimatedCredits} credits{" "}
+              <span className="text-sm muted">Tap to choose a file · PDF, DOCX, slides, images…</span>
+            )}
+          </label>
+          <input
+            id="file"
+            type="file"
+            accept={ACCEPT}
+            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            className="sr-only"
+          />
+        </div>
+
+        <div className="rounded-2xl bg-gradient-to-r from-blue-100 to-pink-100 px-4 py-3 text-sm dark:from-zinc-800 dark:to-zinc-700">
+          {estimate ? (
+            <>
+              <span className="font-medium">Estimated reward: {plural(estimate.reward, "credit")}</span>
               <span className="opacity-70">
-                • {estimatedPageCount} page{estimatedPageCount === 1 ? "" : "s"}{" "}
-                {detectedPages == null ? "(fallback)" : "detected"}
+                {" "}· {plural(estimate.pages, "page")} {detectedPages == null ? "(not detected)" : "detected"} · plus{" "}
+                {FIRST_UPLOAD_BONUS} bonus on your first approved upload
               </span>
+            </>
+          ) : lastUploadEstimate ? (
+            <span className="font-medium">
+              Last upload: ~{plural(lastUploadEstimate.credits, "credit")} once approved
             </span>
+          ) : (
+            <span className="opacity-70">Choose a file to see your estimated reward.</span>
           )}
         </div>
 
-        <input
-          type="file"
-          accept={ACCEPT}
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="w-full min-w-0"
-        />
-
-        <button
-          onClick={upload}
-          disabled={loading}
-          className="
-            w-full py-3 rounded-2xl
-            bg-black text-white
-            hover:opacity-90
-            disabled:opacity-50
-            dark:bg-white dark:text-black
-          "
-        >
-          {loading ? "Uploading..." : "Upload"}
+        <button type="button" onClick={upload} disabled={loading} className="btn-primary btn-lg w-full">
+          {loading ? "Uploading…" : "Upload"}
         </button>
-      </div>
+      </section>
     </main>
   );
 }

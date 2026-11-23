@@ -1,23 +1,12 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { supabaseAdmin as getAdmin } from "@/lib/supabase/admin";
 
 type CollegeRow = { id: string };
 
-function getSupabaseAdmin() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) {
-    return null;
-  }
-
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
 export async function ensureIslamicStudiesSeeded() {
-  const supabaseAdmin = getSupabaseAdmin();
-  if (!supabaseAdmin) return;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return;
+  const supabaseAdmin = getAdmin();
 
   await supabaseAdmin.from("institutions").upsert(
     { id: "open-institution", name: "Open Institution", status: "active" },
