@@ -9,7 +9,9 @@ Built with Next.js 16 (App Router), React 19, Tailwind CSS 3 and Supabase (Auth,
 ## Features
 
 - Email + password accounts (any email domain), password reset
-- Browse by college, major and course; search from the home page
+- Course-first navigation: search by course code, every course has its own page of files
+- Official UDST 2026-2027 study plans for all 37 bachelor programs (year → term, elective pools)
+- Students set their program and pin "My courses" for one-tap access from the home page
 - Uploads with automatic page counting for PDF and DOCX, 10 uploads/day, 50 MB max
 - Moderator queue: review, edit metadata, set reward, approve, reject with reason, delete
 - Ledger-backed credit system (see [`docs/credit-system.md`](docs/credit-system.md))
@@ -65,6 +67,14 @@ supabase db push
 ```
 
 Check what will run first with `supabase db push --dry-run`.
+
+### Study plans
+
+`supabase/migrations/*_050_seed_udst_study_plans.sql` loads the official UDST study plans
+(programs, courses, year/term placement and elective pools). It is idempotent: re-running it
+updates course titles and replaces each program's course list without touching uploads.
+To refresh it for a new academic year, re-scrape the program pages on udst.edu.qa and generate
+a new seed migration in the same format.
 
 ### Making someone a moderator
 

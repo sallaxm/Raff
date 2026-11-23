@@ -2,14 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, GraduationCap } from "lucide-react";
 import { supabaseServer } from "@/lib/supabase/server";
-import { ensureIslamicStudiesSeeded } from "@/lib/islamicStudies";
 
 export const metadata: Metadata = { title: "Browse" };
 
 const FEATURED_SLUG = "islamic-studies";
 
 export default async function BrowsePage() {
-  await ensureIslamicStudiesSeeded();
   const supabase = await supabaseServer();
 
   const { data: colleges, error } = await supabase
@@ -31,7 +29,7 @@ export default async function BrowsePage() {
     <main className="page-narrow">
       <div>
         <h1 className="h1">Browse</h1>
-        <p className="muted">Pick a college to see its majors and courses</p>
+        <p className="muted">Pick your college, then your program — every course in its study plan has its own page of files.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

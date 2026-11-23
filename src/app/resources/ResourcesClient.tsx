@@ -175,8 +175,14 @@ export default function ResourcesClient() {
     <main className="page">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="h1">Resources</h1>
-          <p className="muted">Search and download approved uploads</p>
+          <h1 className="h1">All files</h1>
+          <p className="muted">
+            Every approved upload. Looking for one course?{" "}
+            <Link href="/search" className="underline underline-offset-4">
+              Search by course code
+            </Link>
+            .
+          </p>
         </div>
 
         <Link href={credits === null ? "/profile" : "/credits"} className="card card-hover px-5 py-3">
@@ -253,7 +259,14 @@ export default function ResourcesClient() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-semibold">{r.title}</div>
                 <div className="truncate text-sm muted">
-                  {r.course ? `${r.course.code} · ${r.course.name}` : "General"} · {r.type}
+                  {r.course ? (
+                    <Link href={`/course/${r.course.id}`} className="hover:underline">
+                      {r.course.code} · {r.course.name}
+                    </Link>
+                  ) : (
+                    "Whole program"
+                  )}{" "}
+                  · {r.type}
                 </div>
                 <div className="mt-1 text-xs text-zinc-400">
                   {typeof r.page_count === "number" ? `${plural(r.page_count, "page")} · ` : ""}

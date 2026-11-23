@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { Coins, Download, LogOut } from "lucide-react";
+import { BookOpen, Coins, Download, GraduationCap, LogOut } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/browser";
 import { cn, one } from "@/lib/format";
 
@@ -227,6 +227,8 @@ export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null);
   const [ready, setReady] = useState(false);
   const [credits, setCredits] = useState(0);
+  const [program, setProgram] = useState<{ id: string; name: string } | null>(null);
+  const [pinnedCount, setPinnedCount] = useState(0);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [tab, setTab] = useState<"uploads" | "downloaded">("uploads");
@@ -241,8 +243,8 @@ export default function ProfilePage() {
     }
     const uid = data.user.id;
 
-    const [{ data: profile }, { data: resources }, { data: downloads }] = await Promise.all([
-      supabase.from("profiles").select("credits").eq("id", uid).maybeSingle(),
+    const [{ data: profile }, { data: resources }, { data: downloads }, { count: pins }] = await Promise.all([
+      supabase.from("profiles").select("credits, majors ( id, name )").eq("id", uid).maybeSingle(),
       supabase
         .from("resources")
         .select("id, title, status, rejected_reason")
@@ -253,10 +255,13 @@ export default function ProfilePage() {
         .select("id, created_at, resources ( id, title, type )")
         .eq("user_id", uid)
         .order("created_at", { ascending: false }),
+      supabase.from("user_courses").select("course_id", { count: "exact", head: true }).eq("user_id", uid),
     ]);
 
     setUser(data.user);
     setCredits(profile?.credits ?? 0);
+    setProgram(one(profile?.majors as { id: string; name: string } | { id: string; name: string }[] | null));
+    setPinnedCount(pins ?? 0);
     setUploads((resources ?? []) as Upload[]);
     setPurchases(
       ((downloads ?? []) as DownloadRow[]).map((d) => ({
@@ -332,6 +337,27 @@ export default function ProfilePage() {
         <Link href="/credits" className="btn-primary mt-4">
           <Coins size={14} /> Top up credits
         </Link>
+      </section>
+
+      <section className="card flex flex-wrap items-center gap-4">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          <GraduationCap size={20} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="text-xs muted">My program</div>
+          <div className="truncate font-semibold">{program?.name ?? "Not chosen yet"}</div>
+          <div className="text-xs muted">{pinnedCount} pinned course{pinnedCount === 1 ? "" : "s"}</div>
+        </div>
+        <div className="flex gap-2">
+          {program && (
+            <Link href={`/browse/major/${program.id}`} className="btn-secondary">
+              <BookOpen size={14} /> Study plan
+            </Link>
+          )}
+          <Link href="/browse" className={program ? "btn-ghost" : "btn-primary"}>
+            {program ? "Change" : "Choose program"}
+          </Link>
+        </div>
       </section>
 
       <section className="card space-y-4">
